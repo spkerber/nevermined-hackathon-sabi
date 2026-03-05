@@ -104,12 +104,140 @@ Attendees want a drink without leaving their desk. The vending machine is free b
 
 ### Key features (V1)
 
-- User onboarding: location on map, identity (e.g. upload photo or name).
+- User onboarding: location on map; identity auto-populated from SSO profile (name, avatar).
+- Catalog endpoint (`GET /catalog`) for agents/CLI to list available items.
 - Item selection from vending catalog.
 - Payment: Nevermined credit per delivery (x402 flow: payment-signature, verify, settle).
 - Ops notification: new order with item, location, requester.
 - Final confirmation: confirm location again and show ETA to orderer before considering order placed.
 - Fulfillment: ops mark delivery complete (and optionally notify orderer).
+
+### Service access: Skill + API
+
+The delivery service is available in two modes depending on the use case:
+
+1. **Skill (for AI coding agents):** Builders using Claude Code, Codex, or similar agents install Sabi as a skill. The agent can then place orders conversationally (e.g. "order me a Mountain Dew to desk 4").
+2. **API (for applications):** Builders integrating delivery into their own code call the Sabi REST API directly (e.g. schedule a water delivery every 2 hours on a job site).
+
+Both modes use the same backend and the same authentication (device-flow token, see below). The skill is a thin wrapper that translates natural-language requests into API calls. Both modes require Nevermined payment (x402) — every order debits credits before it is created.
+
+### Builder onboarding and authentication
+
+Onboarding is designed to be dead simple — one command to install, zero separate login step.
+
+#### 1. Install the skill (agent users)
+
+```bash
+npx skills add -g https://github.com/sabi-delivery/sabi-skill
+```
+
+This registers Sabi as an agent skill. The skill definition (SKILL.md) contains the API surface and auth instructions so the agent knows how to call Sabi.
+
+For API-only usage (no agent), builders use the unified CLI directly (see below). There is one package for both the skill and CLI — `sabi`.
+
+#### 2. Lazy auth via device flow (zero-step login)
+
+Authentication uses the OAuth 2.0 Device Authorization Grant (RFC 8628). There is **no separate login command** — auth is triggered lazily on first use. When the agent or CLI makes its first API call and finds no valid token in `~/.sabi/config.json`, it automatically kicks off the device flow:
+
+1. The CLI/agent prints: *"Opening your browser to authenticate with Sabi..."*
+2. Requests a device code from the auth server:
+```bash
+curl -s -X POST https://auth.sabi.delivery/oauth/device/code \
+  -d "client_id=SABI_CLIENT_ID&audience=https://api.sabi.delivery&scope=openid profile email offline_access"
+```
+Response includes `verification_uri_complete`, `device_code`, `interval`, and `user_code`.
+
+3. Opens `verification_uri_complete` in the builder's browser:
+```bash
+open "$verification_uri_complete"        # macOS
+xdg-open "$verification_uri_complete"    # Linux
+```
+The builder authenticates with **GitHub** or **Google** SSO in their browser.
+
+4. Polls for the token:
+```bash
+curl -s -X POST https://auth.sabi.delivery/oauth/token \
+  -d "grant_type=urn:ietf:params:oauth:grant-type:device_code&client_id=SABI_CLIENT_ID&device_code=DEVICE_CODE"
+```
+Poll every `interval` seconds until the response contains `access_token` and `refresh_token`.
+
+5. Saves the token locally:
+```json
+// ~/.sabi/config.json
+{"access_token": "...", "refresh_token": "...", "expires_at": 1234567890}
+```
+
+On subsequent requests, the CLI/skill reads the token from `~/.sabi/config.json`. If the access token is expired, it **silently refreshes** using the stored `refresh_token` — the builder never sees a browser prompt again unless the refresh token itself is revoked.
+
+**Why device flow + refresh tokens?**
+- No token copy/paste — the builder just clicks "authorize" in their browser, once.
+- Works from headless terminals, SSH sessions, and AI agents (the agent opens the browser, the human approves).
+- Silent refresh means the human only authenticates once; no recurring browser interruptions.
+
+#### 3. Identity from SSO (auto-populated)
+
+The builder's name and avatar are extracted from their SSO token claims (`name`, `picture` from the OIDC `profile` scope). There is no need to pass an `identity` field when placing orders — the backend resolves it from the bearer token. This eliminates a manual step and ensures consistency.
+
+#### 4. Making requests (skill or API)
+
+All API calls require `Authorization: Bearer $TOKEN` **and** a Nevermined `payment-signature` header for order placement. The flow is:
+
+1. **Browse catalog** (no payment needed):
+```bash
+TOKEN=$(jq -r '.access_token' ~/.sabi/config.json)
+
+curl -s https://api.sabi.delivery/catalog \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+2. **Place an order** (payment required):
+```bash
+curl -s -X POST https://api.sabi.delivery/orders \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "payment-signature: <x402-signature>" \
+  -H "Content-Type: application/json" \
+  -d '{"item": "Mountain Dew", "location": "desk 4"}'
+```
+
+The backend verifies the `payment-signature` via Nevermined SDK, debits credits, and only then creates the order. If payment fails, the order is rejected with `402 Payment Required`.
+
+When used as a skill, the agent reads SKILL.md, loads the token from `~/.sabi/config.json`, and handles the Nevermined payment flow on behalf of the builder. The agent should call `GET /catalog` first to present available items before asking the builder to choose.
+
+#### 5. Unified CLI (`npx sabi`)
+
+One package provides both the agent skill and a CLI for non-agent builders:
+
+```bash
+npx sabi install-skill                            # register Sabi as an agent skill (wraps `npx skills add`)
+npx sabi login                                    # explicit login (optional; auto-triggered on first use)
+npx sabi catalog                                  # list available items
+npx sabi order "Mountain Dew" --location "desk 4" # place an order (debits Nevermined credits)
+npx sabi "Mountain Dew to desk 4"                 # natural language shorthand (same as above)
+npx sabi reorder                                  # repeat last order
+npx sabi status <order-id>                        # check order status
+```
+
+The CLI handles auth, token refresh, Nevermined payment, and API calls — one codebase, two interfaces (skill + CLI).
+
+#### 6. Remembered location
+
+The first order saves `last_location` to `~/.sabi/config.json`. Subsequent orders reuse it automatically:
+
+```bash
+npx sabi order "Mountain Dew" --location "desk 4"  # first time: saves "desk 4"
+npx sabi order "Water"                              # reuses "desk 4"
+npx sabi order "Sprite" --location "desk 7"         # overrides and saves "desk 7"
+```
+
+This makes repeat orders a single argument. For the API, clients can omit the `location` field and the backend falls back to the user's last known location.
+
+#### 7. Reorder
+
+`npx sabi reorder` repeats the last order (same item, same location, new Nevermined payment). This is the building block for scheduled deliveries — a cron job calling `npx sabi reorder` handles the "water every 2 hours" use case with zero custom code.
+
+#### 8. QR code auth fallback
+
+If the terminal cannot open a browser (SSH, containers, remote servers), the CLI prints a QR code to the terminal using ASCII art. The builder scans it with their phone, approves in their mobile browser, and the CLI picks up the token via the same device-flow polling. No special handling needed — just an alternative to `open`/`xdg-open`.
 
 ### Alternatives considered
 
@@ -122,10 +250,12 @@ Attendees want a drink without leaving their desk. The vending machine is free b
 
 ### Functional
 
-- Orderer can set location (map or floor/zone/desk).
-- Orderer can provide identity (e.g. photo or name) for handoff.
+- Orderer can set location (map or floor/zone/desk). Location is remembered across orders; subsequent orders reuse the last location unless overridden.
+- Orderer identity (name, avatar) is auto-populated from SSO token claims — no manual input needed.
+- `GET /catalog` returns the list of available items so agents/CLI can present options before ordering.
 - Orderer can select an item from the current catalog.
-- At order time, payment is made via Nevermined (x402); order is created only after successful payment.
+- At order time, `POST /orders` requires a Nevermined `payment-signature` (x402). The backend verifies the signature, debits credits, and only then creates the order. No payment = no order (402 Payment Required).
+- Orderer can reorder (repeat last item + location with a new payment).
 - Ops receive a notification for each new order (item, location, requester identity).
 - Orderer sees final confirmation and ETA after payment.
 - Ops can see pending orders and mark delivery complete (and optionally update status).
@@ -133,8 +263,8 @@ Attendees want a drink without leaving their desk. The vending machine is free b
 
 ### Non-functional
 
-- **Auth:** Two roles – orderer and ops – with distinct access (order vs. manage/fulfill).
-- **Security:** No secrets in client; Nevermined API key and plan/agent IDs only in backend env.
+- **Auth:** OAuth 2.0 Device Authorization Grant with GitHub/Google SSO. Access + refresh tokens stored at `~/.sabi/config.json`. Silent refresh on expiry; human only authenticates once. Two roles – orderer and ops – with distinct access (order vs. manage/fulfill).
+- **Security:** No secrets in client; Nevermined API key and plan/agent IDs only in backend env. Builder tokens are scoped per-user via SSO identity. Device flow ensures the human approves the initial login (agents cannot self-authorize). Refresh tokens enable silent renewal without repeated browser prompts.
 - **Latency:** Order placement and notification within seconds of payment.
 - **Hosting:** Deploy on AWS or Cloudflare Workers (exact service TBD).
 
@@ -142,6 +272,8 @@ Attendees want a drink without leaving their desk. The vending machine is free b
 
 - Payment validation: require `payment-signature` (x402) for order placement; verify then settle via Nevermined SDK.
 - One “delivery service” agent (or API) that accepts paid orders and notifies ops.
+- Service is accessible as both an agent skill (installed via `npx skills add`) and a REST API, sharing the same backend and auth.
+- Skill definition (SKILL.md) documents the API surface and auth flow so agents can self-serve.
 
 ---
 
@@ -164,9 +296,10 @@ Attendees want a drink without leaving their desk. The vending machine is free b
 ### Architecture (high-level)
 
 - **Frontend (or client):** Orderer and ops UIs (or minimal web flows) for onboarding, order, and ops queue. Exact stack TBD.
-- **Backend / API:** Order placement, Nevermined payment validation (verify + settle), order storage, notification to ops, ETA calculation. Hosted on **AWS** or **Cloudflare Workers**.
+- **Backend / API:** Order placement, Nevermined payment validation (verify + settle), order storage, notification to ops, ETA calculation. Hosted on **AWS** or **Cloudflare Workers**. Serves both direct API consumers and the agent skill.
+- **Skill layer:** A SKILL.md file (hosted in a public GitHub repo) that documents the API surface and auth flow. Installed by builders via `npx skills add -g <repo-url>`. The skill is a zero-dependency wrapper — it teaches the agent how to call the REST API; no separate server or MCP process needed.
 - **Payment:** **Nevermined** only (required). Register agent + plan in Nevermined App; use payments SDK (Python or TypeScript) for verify/settle in the order flow.
-- **Auth:** Two user types (orderer, ops); mechanism TBD (e.g. simple login, or hackathon badges/tokens).
+- **Auth:** OAuth 2.0 Device Authorization Grant. Builders authenticate via GitHub or Google SSO in their browser. Token saved to `~/.sabi/config.json` and used for all subsequent API/skill requests. Two roles: orderer (place orders) and ops (fulfill orders).
 
 ### Dependencies
 
@@ -195,9 +328,11 @@ Attendees want a drink without leaving their desk. The vending machine is free b
 ## 10. Open questions
 
 - Exact AWS or Cloudflare Workers service (Lambda + API Gateway vs. Workers + Durable Objects, etc.).
-- Auth mechanism for orderer and ops (OAuth, magic link, hackathon-specific).
+- ~~Auth mechanism for orderer and ops~~ **Decided:** OAuth 2.0 Device Authorization Grant with GitHub/Google SSO.
+- Auth provider: Auth0, or self-hosted (exact provider TBD; device flow is provider-agnostic).
 - ETA model (fixed delay vs. simple distance/zone-based).
 - Whether to add LangChain agents/evals in V1 or only after first working demo.
+- Skill registry: host skill repo at `sabi-delivery/sabi-skill` or equivalent; confirm `npx skills add` compatibility.
 
 ---
 
