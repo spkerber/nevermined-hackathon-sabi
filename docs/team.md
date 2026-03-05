@@ -1,20 +1,16 @@
 # Team SABI
 
-Autonomous Business Hackathon – vending machine delivery (A2A).
+Nevermined Hackathon – Meta-glasses physical verification request service (A2A).
 
 ## Members
 
 | Name | Role |
 |------|------|
-| Spencer | |
-| Ben | Ops (delivery) |
-| Anis | |
-| Irina | |
-
-**Ops (delivery):** Ben and Spencer walk drinks from the vending machine to the requester’s location.
+| Spencer Kerber | |
+| Ben Imadali | |
 
 ## Repo
 
 - **Project:** nevermined-hackathon-sabi  
 - **Location:** `GitHub/practice-projects/nevermined-hackathon-sabi`  
-- Add Ben (and others) as collaborators when the remote is set up.
+- Ben has access; he may push from a new git worktree. Pull from `origin` before redoing the PRD.

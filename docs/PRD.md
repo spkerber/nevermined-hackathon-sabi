@@ -1,4 +1,6 @@
-# PRD: Vending Machine Delivery (A2A)
+# PRD: Vending Machine Delivery (A2A) — *Legacy*
+
+**Status:** This PRD describes the original vending-machine delivery concept. It is being revised for the new **Meta-glasses physical verification request** service (mechanical-turk + Meta glasses, human-in-the-loop, veracity scoring). Pull latest from repo after Ben’s worktree push, then redo this PRD.
 
 Product Requirement Document for the SABI hackathon project: delivery-as-a-service powered by Nevermined A2A payments, with two user types (orderer and ops).
 
