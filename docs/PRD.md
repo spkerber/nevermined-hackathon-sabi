@@ -10,6 +10,10 @@ Product Requirement Document for the SABI hackathon project: verification-as-a-s
 
 Enable anyone to request verifiable, real-world information -- answered and evidenced by a nearby human verifier wearing Ray-Ban Meta smart glasses. The *product* is the verification service; payment is done via agent-to-agent transaction (Nevermined credits). Verifiers are matched by geolocation from a pool and compensated per job.
 
+### Thesis
+
+The most valuable agents operate at the interface between the abstract digital world and the chaotic physical world. In an era of fake and generated content, verifiable truth about physical reality is increasingly scarce and valuable. Sabi bridges that gap -- turning real humans with wearable hardware into a paid verification layer that AI agents and remote parties can tap into for ground-truth information with photographic evidence.
+
 ### Background
 
 - Hackathon focus: A2A transactions with payment (x402 / Nevermined).
@@ -172,7 +176,7 @@ Both modes use the same backend and the same authentication. Both require Neverm
 - **Auth:** OAuth 2.0 Device Authorization Grant with GitHub/Google SSO. Two roles -- requester and verifier.
 - **Security:** No secrets in client; Nevermined API key and plan/agent IDs only in backend env.
 - **Latency:** Verifier matching within seconds of payment. Photo uploads near-real-time during session.
-- **Hosting:** Deploy on AWS or Cloudflare Workers (exact service TBD).
+- **Hosting:** Cloudflare Agents SDK (Durable Objects + Workers). Globally distributed, auto-scaling.
 
 ### Agent / A2A
 
@@ -201,9 +205,9 @@ Both modes use the same backend and the same authentication. Both require Neverm
 ### Architecture (high-level)
 
 - **Webapp (requester):** Submit verification requests. Review artifacts via step-through photo viewer with transcribed answer. Exact stack TBD.
-- **Verifier companion app (iPhone):** A fork of [VisionClaw](https://github.com/nicholasgoulding/VisionClaw) running on the verifier's iPhone, paired with Ray-Ban Metas. Handles job notifications, accept/decline, session lifecycle, programmatic photo capture (1/5s), and voice transcription. All Ray-Ban Meta interaction flows through this app.
-- **Backend / API:** Verification request handling, Nevermined payment validation (verify + settle), geolocation matching, session lifecycle management, photo storage, voice transcription, artifact assembly. Hosted on AWS or Cloudflare Workers.
-- **Ray-Ban Meta integration:** Handled entirely through the VisionClaw fork companion app on iPhone. The app interfaces with Ray-Ban Metas for programmatic photo capture (1/5s) and leverages VisionClaw's built-in transcription for vocal answers. Photos uploaded to cloud storage during session.
+- **Verifier companion app (iPhone):** A fork of the ray-banned VisionClaw app (`~/Projects/ray-banned`). SwiftUI + MVVM architecture. Paired with Ray-Ban Metas via Meta DAT SDK (`MWDATCore`, `MWDATCamera`). Handles job notifications, accept/decline, session lifecycle, programmatic photo capture (1/5s), and voice transcription. All Ray-Ban Meta interaction flows through this app. Reference app already has a 5-second timelapse capture pattern (`captureFrameIfNeeded()` in `CookingSessionManager`) that we adapt for verification sessions.
+- **Backend / API:** Built on the **Cloudflare Agents SDK** (TypeScript classes extending `Agent`, running on Durable Objects). Each verification job maps to an agent instance with built-in SQLite (`this.sql`) for structured data (jobs, sessions, frame metadata) and real-time WebSocket state sync (`this.setState()`) for pushing status updates to requesters. **Cloudflare R2** for photo storage. No external database needed -- Durable Objects provide persistence, scheduling, and real-time communication in one primitive.
+- **Ray-Ban Meta integration:** Handled entirely through the companion app. Uses Meta DAT SDK for device pairing (`wearables.startRegistration()`), camera permissions, and streaming (`StreamSession` with `StreamSessionConfig`). Photo capture via `streamSession.capturePhoto(format: .jpeg)` with `photoDataPublisher` listener. Audio captured from iPhone mic via `AVAudioEngine` (not glasses mic). Transcription via Gemini 2.5 Flash native audio WebSocket -- same approach as ray-banned reference app (audio sent as base64 PCM at 16kHz, transcription returned inline).
 - **Payment:** Nevermined only (required). Register agent + plan in Nevermined App; use payments SDK for verify/settle.
 - **Auth:** OAuth 2.0 Device Authorization Grant. Two roles: requester (submit requests, review artifacts) and verifier (accept jobs, perform verifications).
 
@@ -213,43 +217,83 @@ Both modes use the same backend and the same authentication. Both require Neverm
 
 ```
 Requester -> POST /verifications (question, target_lat, target_lng, payment-signature)
-Backend -> verify payment -> find nearby verifiers -> offer job to closest
+Worker (routeAgentRequest) -> VerificationAgent instance created (Durable Object)
+VerificationAgent.onRequest() -> verify Nevermined payment -> persist job in this.sql
+  -> this.setState({ status: "connecting" })  // pushed to requester via WebSocket
+  -> find nearby verifiers -> offer job to closest
 ```
 
 #### 2. Job acceptance
 
 ```
-Verifier -> POST /jobs/:id/accept
-Backend -> notify requester -> send detailed instructions to verifier
+Verifier companion app -> agent.stub.acceptJob(verifierId)  // @callable() RPC
+VerificationAgent -> this.setState({ status: "accepted", verifier: {...} })
+  // requester sees status update in real-time via WebSocket
+  -> send detailed instructions to verifier
 ```
 
 #### 3. Verification session
 
 ```
-Verifier -> starts session in companion app (VisionClaw fork)
-             Status: connecting -> accepted -> in_progress
-Companion app -> programmatically captures 1 photo every 5 seconds from Ray-Ban Metas -> uploads to backend
-Verifier -> speaks answer to verification question -> transcribed by VisionClaw
-Verifier -> ends session in companion app (answer captured)
-             Status: in_progress -> verified
-Backend -> assemble artifact (question + answer + photos) -> notify requester
+Verifier -> taps "Start Verification" in companion app
+Companion app -> agent.stub.startSession()  // @callable()
+VerificationAgent -> this.setState({ status: "in_progress" })
+             App opens StreamSession (DAT SDK) with Ray-Ban Metas
+Companion app -> captureFrameIfNeeded() every 5 seconds (adapted from CookingSessionManager pattern)
+             -> streamSession.capturePhoto(format: .jpeg) -> photoDataPublisher
+             -> upload JPEG to R2 -> agent.stub.addFrame(r2Key, timestamp)  // persists in this.sql
+Verifier -> speaks answer to verification question
+             -> iPhone mic (AVAudioEngine) -> 16kHz PCM -> Gemini WebSocket -> inputTranscription returned
+Verifier -> taps "End Verification" (or voice command)
+             -> photo capture timer stops
+Companion app -> agent.stub.endSession(transcribedAnswer)  // @callable()
+VerificationAgent -> this.sql: save answer + finalize session
+             -> this.setState({ status: "verified", artifact: {...} })
+             // requester sees "verified" in real-time, artifact ready for review
 ```
 
 #### 4. Artifact review
 
 ```
-Requester -> opens artifact in webapp
-Webapp -> step-through photo viewer (prev/next through timestamped photos)
+Requester webapp -> connected to VerificationAgent via WebSocket (useAgent hook)
+  -> agent.state.status === "verified"
+  -> agent.stub.getArtifact()  // @callable() returns question + answer + frame URLs
+Webapp -> step-through photo viewer (prev/next through timestamped photos from R2)
          + transcribed vocal answer displayed alongside
+```
+
+### Backend architecture (Cloudflare Agents SDK)
+
+```
+wrangler.jsonc:
+  - durable_objects: [VerificationAgent, MatchingAgent]
+  - r2_buckets: [{ binding: "FRAMES", bucket_name: "sabi-frames" }]
+  - migrations: [{ new_sqlite_classes: ["VerificationAgent"] }]
+
+VerificationAgent (extends Agent):
+  - this.sql: jobs, sessions, frames tables (SQLite in Durable Object)
+  - this.setState(): real-time status sync to requester webapp (WebSocket)
+  - @callable(): acceptJob(), startSession(), addFrame(), endSession(), getArtifact()
+  - this.env.FRAMES (R2): photo storage
+  - this.schedule(): job offer timeouts, session expiry
+
+Worker (fetch handler):
+  - routeAgentRequest(request, env) for WebSocket + RPC routing
+  - REST endpoints for Nevermined payment validation, verifier pool management
 ```
 
 ### Dependencies
 
 - **Nevermined:** API key, agent ID, plan ID; SDK for x402.
-- **VisionClaw fork:** iPhone companion app (forked from [VisionClaw](https://github.com/nicholasgoulding/VisionClaw)) for Ray-Ban Meta integration, programmatic photo capture, and built-in transcription.
+- **VisionClaw fork (ray-banned):** iPhone companion app forked from `~/Projects/ray-banned`. Key frameworks:
+  - **Meta DAT SDK** (`MWDATCore`, `MWDATCamera`): Ray-Ban Meta pairing, streaming, photo capture.
+  - **Gemini 2.5 Flash** (WebSocket): Real-time voice transcription (audio in -> text out). Model: `gemini-2.5-flash-native-audio-preview`.
+  - **AVFoundation / AVAudioEngine**: iPhone mic capture, audio playback.
+  - **SwiftUI**: UI layer (MVVM pattern with `@MainActor`, `ObservableObject`, `@Published`).
+  - Info.plist requires: MetaAppID, ClientToken, ExternalAccessory protocol `com.meta.ar.wearable`, Bluetooth background modes.
+- **Cloudflare Agents SDK:** Backend framework. Durable Objects for stateful agent instances with built-in SQLite (`this.sql`), real-time WebSocket state sync (`this.setState()`), scheduled tasks, and `@callable()` RPC methods. Workers handle HTTP routing via `routeAgentRequest()`.
+- **Cloudflare R2:** Photo storage (JPEG frames uploaded during verification sessions).
 - **Geolocation:** Browser geolocation API for verifiers; geocoding for target locations.
-- **Cloud storage:** S3 or equivalent for session photos.
-- **Hosting:** AWS or Cloudflare Workers.
 - **Optional (post-V1):** Exa, Apify, LangChain for deeper agent capabilities.
 
 ### Constraints
@@ -275,11 +319,17 @@ Webapp -> step-through photo viewer (prev/next through timestamped photos)
 
 ## 10. Open questions
 
-- Exact hosting service (Lambda + API Gateway vs. Workers + Durable Objects, etc.).
+- ~~Exact hosting service~~ **Decided:** Cloudflare Agents SDK (Durable Objects + Workers + R2). No external database -- SQLite built into Durable Objects.
+- ~~Transcription service~~ **Decided:** Gemini 2.5 Flash native audio via WebSocket (same as ray-banned).
+- ~~Photo capture approach~~ **Decided:** Programmatic via DAT SDK `capturePhoto()`, adapted from ray-banned's `captureFrameIfNeeded()` pattern.
 - Auth provider: Auth0, or self-hosted (device flow is provider-agnostic).
 - How to handle verifier availability/status (online/offline, busy/free).
-- VisionClaw fork scope: what modifications are needed beyond adding Sabi job management and programmatic photo timer?
-- How to trigger session start/end: voice command via Ray-Ban Metas, button in companion app, or both?
+- VisionClaw fork scope: key modifications needed on top of ray-banned:
+  - Add job management UI (receive/accept/decline offers).
+  - Adapt `CookingSessionManager` timelapse pattern into a `VerificationSessionManager` with 5s photo timer.
+  - Add Sabi backend API integration (job polling, photo upload, answer submission).
+  - Strip cooking-specific features (recipe synthesis, observation logging).
+- Session start/end: button in companion app (primary), with optional voice command via Gemini tool call (stretch goal).
 
 ---
 
@@ -290,7 +340,9 @@ Webapp -> step-through photo viewer (prev/next through timestamped photos)
 - [docs/references.md](references.md) -- hackathon links, Nevermined docs, seller-simple-agent.
 - [Nevermined 5-minute setup](https://nevermined.ai/docs/integrate/quickstart/5-minute-setup).
 - [nevermined-io/hackathons -- seller-simple-agent](https://github.com/nevermined-io/hackathons/tree/main/agents/seller-simple-agent).
-- [VisionClaw](https://github.com/nicholasgoulding/VisionClaw) -- iPhone app for Ray-Ban Meta integration (fork base).
+- [Cloudflare Agents SDK docs](https://developers.cloudflare.com/agents/) -- Durable Objects, SQLite, WebSocket state sync, @callable() RPC.
+- [VisionClaw](https://github.com/nicholasgoulding/VisionClaw) -- iPhone app for Ray-Ban Meta integration (upstream).
+- ray-banned (`~/Projects/ray-banned`) -- Working VisionClaw fork used as reference implementation and fork base. Demonstrates DAT SDK integration, 5s timelapse capture, Gemini transcription, Cloudflare Workers + Supabase + R2 backend.
 - [Ray-Ban Meta developer docs](https://www.meta.com/smart-glasses/) -- hardware reference.
 
 ### Glossary
@@ -302,3 +354,5 @@ Webapp -> step-through photo viewer (prev/next through timestamped photos)
 - **Artifact:** The deliverable for a verification job: original question + transcribed answer + timestamped photos.
 - **Verification session:** The active period during which the verifier's Ray-Ban Metas capture photos and the verifier answers the question vocally.
 - **Credits:** Nevermined plan credits consumed per verification job.
+- **Durable Object:** Cloudflare's stateful compute primitive. Each verification job runs as a Durable Object instance with built-in SQLite and WebSocket support.
+- **R2:** Cloudflare's S3-compatible object storage, used for verification session photos.
