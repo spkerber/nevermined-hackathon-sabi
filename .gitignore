@@ -50,3 +50,4 @@ webapp/.env.local
 
 # iOS companion app secrets
 companion/CameraAccess/Secrets.swift
+.vercel

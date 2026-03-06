@@ -54,6 +54,7 @@
 		C00K000200000002 /* VerificationToolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00K000100000002 /* VerificationToolHandler.swift */; };
 		C00K000200000003 /* SabiAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00K000100000003 /* SabiAPIClient.swift */; };
 		C00K000200000004 /* SabiConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00K000100000004 /* SabiConfig.swift */; };
+		C00K000200000006 /* RemoteConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00K000100000006 /* RemoteConfig.swift */; };
 		C00K000200000005 /* ToolCallModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00K000100000005 /* ToolCallModels.swift */; };
 		SAB1000200000001 /* VerificationJobView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SAB1000100000001 /* VerificationJobView.swift */; };
 /* End PBXBuildFile section */
@@ -130,6 +131,7 @@
 		C00K000100000002 /* VerificationToolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationToolHandler.swift; sourceTree = "<group>"; };
 		C00K000100000003 /* SabiAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SabiAPIClient.swift; sourceTree = "<group>"; };
 		C00K000100000004 /* SabiConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SabiConfig.swift; sourceTree = "<group>"; };
+		C00K000100000006 /* RemoteConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteConfig.swift; sourceTree = "<group>"; };
 		C00K000100000005 /* ToolCallModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallModels.swift; sourceTree = "<group>"; };
 		SAB1000100000001 /* VerificationJobView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerificationJobView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -304,6 +306,7 @@
 				C00K000100000002 /* VerificationToolHandler.swift */,
 				C00K000100000003 /* SabiAPIClient.swift */,
 				C00K000100000004 /* SabiConfig.swift */,
+				C00K000100000006 /* RemoteConfig.swift */,
 			);
 			path = Cooking;
 			sourceTree = "<group>";
@@ -468,6 +471,7 @@
 				C00K000200000002 /* VerificationToolHandler.swift in Sources */,
 				C00K000200000003 /* SabiAPIClient.swift in Sources */,
 				C00K000200000004 /* SabiConfig.swift in Sources */,
+				C00K000200000006 /* RemoteConfig.swift in Sources */,
 				C00K000200000005 /* ToolCallModels.swift in Sources */,
 				SAB1000200000001 /* VerificationJobView.swift in Sources */,
 			);

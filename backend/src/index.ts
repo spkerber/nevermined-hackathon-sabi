@@ -35,6 +35,16 @@ export default {
       return json({ status: "ok", timestamp: Date.now() }, 200, cors);
     }
 
+    // ── GET /api/config ── Remote config for mobile app OTA updates
+    if (url.pathname === "/api/config" && request.method === "GET") {
+      return json({
+        minAppVersion: "1.0.0",
+        latestAppVersion: "1.0.0",
+        apiBaseUrl: url.origin,
+        features: {},
+      }, 200, cors);
+    }
+
     // Route WebSocket connections to agents (path: /agents/verification-agent/:id)
     if (url.pathname.startsWith("/agents/")) {
       const agentResp = await routeAgentRequest(request, env);
