@@ -78,11 +78,27 @@ docs/             PRD, references, team info
 - **Spencer Kerber**
 - **Ben Imadali**
 
+Ben has access and may push from a separate git worktree; pull from `origin` before redoing the PRD.
+
+## Secrets & config
+
+We use **Doppler** for API keys and secrets. For local dev you can still use `.env` (copy from `.env.example`); in CI/deploy, inject via Doppler. Nevermined credentials: `NVM_API_KEY`, `NVM_AGENT_ID`, `NVM_PLAN_ID` (create plan in [Nevermined App](https://nevermined.app)). See [docs/doppler-and-env.md](docs/doppler-and-env.md) and [docs/sandbox-to-prod.md](docs/sandbox-to-prod.md).
+
 ## Docs
 
 - [docs/PRD.md](docs/PRD.md) -- Full product requirements
 - [docs/references.md](docs/references.md) -- Hackathon and Nevermined links
 - [docs/team.md](docs/team.md) -- Team info
+
+## Buyers / Sellers agents (feature branch)
+
+On branch `feature/buyers-sellers-agents`: minimal **seller** (Express API with x402) and **buyer** (order plan + call seller) for sandbox → prod payment flow. No VisionClaw integration.
+
+- **Register agent (once):** `npm run register-agent` — requires `NVM_API_KEY`, `BUILDER_ADDRESS`; writes `NVM_AGENT_ID`, `NVM_PLAN_ID` to add to env/Doppler.
+- **Run seller:** `npm run seller` — serves `POST /query` with payment validation (402 without `payment-signature`).
+- **Run buyer:** `npm run buyer:order-and-call "Your question"` — set `NVM_PLAN_ID`, `NVM_AGENT_ID`, `SELLER_URL`; uses subscriber `NVM_API_KEY` to order plan, get x402 token, call seller.
+
+Refs: [5-Minute Setup](https://nevermined.ai/docs/integrate/quickstart/5-minute-setup), [Nevermined App](https://nevermined.app/permissions/global-permissions), [Doppler](https://dashboard.doppler.com/workplace/37ee0f06177aa6997f55/projects/nevermined-hackathon-sabi).
 
 ## License
 

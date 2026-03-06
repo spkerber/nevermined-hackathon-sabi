@@ -16,6 +16,11 @@
 - **Nevermined hackathons repo:** [nevermined-io/hackathons](https://github.com/nevermined-io/hackathons)
 - **Seller simple agent (x402, tiered credits, A2A):** [agents/seller-simple-agent](https://github.com/nevermined-io/hackathons/tree/main/agents/seller-simple-agent)
 
+## Project docs
+
+- **Doppler and env:** [docs/doppler-and-env.md](doppler-and-env.md) — secrets for seller/buyer, Doppler project link.
+- **Sandbox → prod:** [docs/sandbox-to-prod.md](sandbox-to-prod.md) — path from 5-min sandbox to production transaction.
+
 ## Stack (for this project)
 
 - **Payments:** Nevermined (required)
