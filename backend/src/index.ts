@@ -30,13 +30,15 @@ export default {
       return new Response(null, { status: 204, headers: cors });
     }
 
-    // Route WebSocket connections to agents (path: /agents/verification-agent/:id)
-    const agentResp = await routeAgentRequest(request, env);
-    if (agentResp) return agentResp;
-
-    // Health check
+    // Health check (before agent routing to avoid interception)
     if (url.pathname === "/health") {
       return json({ status: "ok", timestamp: Date.now() }, 200, cors);
+    }
+
+    // Route WebSocket connections to agents (path: /agents/verification-agent/:id)
+    if (url.pathname.startsWith("/agents/")) {
+      const agentResp = await routeAgentRequest(request, env);
+      if (agentResp) return agentResp;
     }
 
     // ── GET /api/verifications ── List verification jobs
