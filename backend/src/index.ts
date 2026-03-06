@@ -46,10 +46,6 @@ const PUBLIC_PATHS = new Set([
   "/api/config",
   "/api/auth/signup",
   "/api/auth/login",
-  "/api/auth/github",
-  "/api/auth/github/callback",
-  "/api/auth/google",
-  "/api/auth/google/callback",
 ]);
 
 function isPublicPath(pathname: string): boolean {
@@ -154,145 +150,6 @@ export default {
         return json({ apiKey: account.apiKey, userId: account.id, email: account.email }, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
-      }
-    }
-
-    // ── GitHub OAuth ──
-
-    if (url.pathname === "/api/auth/github" && request.method === "GET") {
-      const state = crypto.randomUUID();
-      const callbackUrl = `${url.origin}/api/auth/github/callback`;
-      const githubUrl = new URL("https://github.com/login/oauth/authorize");
-      githubUrl.searchParams.set("client_id", env.GITHUB_CLIENT_ID);
-      githubUrl.searchParams.set("redirect_uri", callbackUrl);
-      githubUrl.searchParams.set("scope", "user:email");
-      githubUrl.searchParams.set("state", state);
-      return Response.redirect(githubUrl.toString(), 302);
-    }
-
-    if (url.pathname === "/api/auth/github/callback" && request.method === "GET") {
-      try {
-        const code = url.searchParams.get("code");
-        if (!code) return json({ error: "Missing code" }, 400, cors);
-
-        // Exchange code for access token
-        const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({
-            client_id: env.GITHUB_CLIENT_ID,
-            client_secret: env.GITHUB_CLIENT_SECRET,
-            code,
-          }),
-        });
-        const tokenData = await tokenRes.json() as { access_token?: string; error?: string };
-        if (!tokenData.access_token) {
-          return json({ error: tokenData.error ?? "OAuth token exchange failed" }, 400, cors);
-        }
-
-        // Get user info
-        const userRes = await fetch("https://api.github.com/user", {
-          headers: { Authorization: `Bearer ${tokenData.access_token}`, "User-Agent": "Sabi" },
-        });
-        const ghUser = await userRes.json() as { id: number; email: string | null; login: string };
-
-        // Get primary email if not public
-        let email = ghUser.email;
-        if (!email) {
-          const emailsRes = await fetch("https://api.github.com/user/emails", {
-            headers: { Authorization: `Bearer ${tokenData.access_token}`, "User-Agent": "Sabi" },
-          });
-          const emails = await emailsRes.json() as { email: string; primary: boolean; verified: boolean }[];
-          const primary = emails.find((e) => e.primary && e.verified);
-          email = primary?.email ?? emails[0]?.email ?? null;
-        }
-        if (!email) {
-          return redirectWithError(env, "Could not retrieve email from GitHub");
-        }
-
-        const githubId = String(ghUser.id);
-        const registry = getAuthRegistry(env);
-
-        // Check if GitHub account is already linked
-        let account = await registry.getAccountByGithubId(githubId);
-        if (!account) {
-          // Check if email account exists — link GitHub to it
-          account = await registry.getAccountByEmail(email);
-          if (account) {
-            await registry.linkGithub(account.id, githubId);
-          } else {
-            // Create new account
-            const apiKey = generateApiKey();
-            account = await registry.createAccount({ email, passwordHash: null, apiKey, githubId });
-          }
-        }
-
-        return redirectWithToken(env, account.apiKey);
-      } catch (err) {
-        return redirectWithError(env, (err as Error).message);
-      }
-    }
-
-    // ── Google OAuth ──
-
-    if (url.pathname === "/api/auth/google" && request.method === "GET") {
-      const callbackUrl = `${url.origin}/api/auth/google/callback`;
-      const googleUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-      googleUrl.searchParams.set("client_id", env.GOOGLE_CLIENT_ID);
-      googleUrl.searchParams.set("redirect_uri", callbackUrl);
-      googleUrl.searchParams.set("response_type", "code");
-      googleUrl.searchParams.set("scope", "openid email profile");
-      googleUrl.searchParams.set("access_type", "offline");
-      return Response.redirect(googleUrl.toString(), 302);
-    }
-
-    if (url.pathname === "/api/auth/google/callback" && request.method === "GET") {
-      try {
-        const code = url.searchParams.get("code");
-        if (!code) return json({ error: "Missing code" }, 400, cors);
-
-        const callbackUrl = `${url.origin}/api/auth/google/callback`;
-        const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            code,
-            client_id: env.GOOGLE_CLIENT_ID,
-            client_secret: env.GOOGLE_CLIENT_SECRET,
-            redirect_uri: callbackUrl,
-            grant_type: "authorization_code",
-          }),
-        });
-        const tokenData = await tokenRes.json() as { access_token?: string; error?: string };
-        if (!tokenData.access_token) {
-          return json({ error: tokenData.error ?? "OAuth token exchange failed" }, 400, cors);
-        }
-
-        // Get user info
-        const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` },
-        });
-        const gUser = await userRes.json() as { id: string; email: string };
-        if (!gUser.email) {
-          return redirectWithError(env, "Could not retrieve email from Google");
-        }
-
-        const registry = getAuthRegistry(env);
-
-        let account = await registry.getAccountByGoogleId(gUser.id);
-        if (!account) {
-          account = await registry.getAccountByEmail(gUser.email);
-          if (account) {
-            await registry.linkGoogle(account.id, gUser.id);
-          } else {
-            const apiKey = generateApiKey();
-            account = await registry.createAccount({ email: gUser.email, passwordHash: null, apiKey, googleId: gUser.id });
-          }
-        }
-
-        return redirectWithToken(env, account.apiKey);
-      } catch (err) {
-        return redirectWithError(env, (err as Error).message);
       }
     }
 
@@ -700,14 +557,3 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-// --- OAuth redirect helpers ---
-
-function redirectWithToken(env: Env, apiKey: string): Response {
-  const redirectUrl = `${env.AUTH_REDIRECT_URL}/login#token=${apiKey}`;
-  return Response.redirect(redirectUrl, 302);
-}
-
-function redirectWithError(env: Env, error: string): Response {
-  const redirectUrl = `${env.AUTH_REDIRECT_URL}/login#error=${encodeURIComponent(error)}`;
-  return Response.redirect(redirectUrl, 302);
-}

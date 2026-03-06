@@ -8,8 +8,6 @@ export interface Account {
   passwordHash: string | null;
   apiKey: string;
   nvmAgentId: string | null;
-  githubId: string | null;
-  googleId: string | null;
   createdAt: number;
 }
 
@@ -17,8 +15,6 @@ export class AuthRegistry extends DurableObject<Env> {
   private accounts: Map<string, Account> = new Map();
   private emailIndex: Map<string, string> = new Map();
   private apiKeyIndex: Map<string, string> = new Map();
-  private githubIndex: Map<string, string> = new Map();
-  private googleIndex: Map<string, string> = new Map();
   private initialized = false;
 
   private async ensureLoaded() {
@@ -29,8 +25,6 @@ export class AuthRegistry extends DurableObject<Env> {
         this.accounts.set(id, account);
         this.emailIndex.set(account.email.toLowerCase(), id);
         this.apiKeyIndex.set(account.apiKey, id);
-        if (account.githubId) this.githubIndex.set(account.githubId, id);
-        if (account.googleId) this.googleIndex.set(account.googleId, id);
       }
     }
     this.initialized = true;
@@ -45,8 +39,6 @@ export class AuthRegistry extends DurableObject<Env> {
     passwordHash: string | null;
     apiKey: string;
     nvmAgentId?: string;
-    githubId?: string;
-    googleId?: string;
   }): Promise<Account> {
     await this.ensureLoaded();
 
@@ -61,16 +53,12 @@ export class AuthRegistry extends DurableObject<Env> {
       passwordHash: params.passwordHash,
       apiKey: params.apiKey,
       nvmAgentId: params.nvmAgentId ?? null,
-      githubId: params.githubId ?? null,
-      googleId: params.googleId ?? null,
       createdAt: Date.now(),
     };
 
     this.accounts.set(account.id, account);
     this.emailIndex.set(emailLower, account.id);
     this.apiKeyIndex.set(account.apiKey, account.id);
-    if (account.githubId) this.githubIndex.set(account.githubId, account.id);
-    if (account.googleId) this.googleIndex.set(account.googleId, account.id);
 
     await this.save();
     return account;
@@ -89,36 +77,6 @@ export class AuthRegistry extends DurableObject<Env> {
     const account = this.accounts.get(id);
     if (!account) return null;
     return { id: account.id, email: account.email };
-  }
-
-  async getAccountByGithubId(githubId: string): Promise<Account | null> {
-    await this.ensureLoaded();
-    const id = this.githubIndex.get(githubId);
-    return id ? this.accounts.get(id) ?? null : null;
-  }
-
-  async getAccountByGoogleId(googleId: string): Promise<Account | null> {
-    await this.ensureLoaded();
-    const id = this.googleIndex.get(googleId);
-    return id ? this.accounts.get(id) ?? null : null;
-  }
-
-  async linkGithub(accountId: string, githubId: string): Promise<void> {
-    await this.ensureLoaded();
-    const account = this.accounts.get(accountId);
-    if (!account) throw new Error("Account not found");
-    account.githubId = githubId;
-    this.githubIndex.set(githubId, accountId);
-    await this.save();
-  }
-
-  async linkGoogle(accountId: string, googleId: string): Promise<void> {
-    await this.ensureLoaded();
-    const account = this.accounts.get(accountId);
-    if (!account) throw new Error("Account not found");
-    account.googleId = googleId;
-    this.googleIndex.set(googleId, accountId);
-    await this.save();
   }
 
   async setNvmAgentId(accountId: string, nvmAgentId: string): Promise<void> {

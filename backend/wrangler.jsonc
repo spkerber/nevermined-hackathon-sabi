@@ -45,7 +45,4 @@
   }
   // Secrets (set via `wrangler secret put`):
   // NVM_API_KEY, NVM_PLAN_ID, NVM_AGENT_ID
-  // GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
-  // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
-  // AUTH_REDIRECT_URL
 }
