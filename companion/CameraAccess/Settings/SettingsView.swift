@@ -6,6 +6,7 @@ struct SettingsView: View {
 
   @State private var geminiAPIKey: String = ""
   @State private var workerURL: String = ""
+  @State private var sabiApiKey: String = ""
   @State private var geminiSystemPrompt: String = ""
   @State private var showResetConfirmation = false
 
@@ -24,7 +25,7 @@ struct SettingsView: View {
           }
         }
 
-        Section(header: Text("Sabi Backend"), footer: Text("The Cloudflare Worker handles verification jobs and photo storage.")) {
+        Section(header: Text("Sabi Backend"), footer: Text("The Cloudflare Worker handles verification jobs and photo storage. API key is auto-generated on first use.")) {
           VStack(alignment: .leading, spacing: 4) {
             Text("Backend URL")
               .font(.caption)
@@ -33,6 +34,15 @@ struct SettingsView: View {
               .autocapitalization(.none)
               .disableAutocorrection(true)
               .keyboardType(.URL)
+              .font(.system(.body, design: .monospaced))
+          }
+          VStack(alignment: .leading, spacing: 4) {
+            Text("API Key")
+              .font(.caption)
+              .foregroundColor(.secondary)
+            TextField("Auto-generated on first use", text: $sabiApiKey)
+              .autocapitalization(.none)
+              .disableAutocorrection(true)
               .font(.system(.body, design: .monospaced))
           }
         }
@@ -84,12 +94,15 @@ struct SettingsView: View {
   private func loadCurrentValues() {
     geminiAPIKey = settings.geminiAPIKey
     workerURL = settings.workerURL
+    sabiApiKey = settings.sabiApiKey ?? ""
     geminiSystemPrompt = settings.geminiSystemPrompt
   }
 
   private func save() {
     settings.geminiAPIKey = geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.workerURL = workerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedApiKey = sabiApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    settings.sabiApiKey = trimmedApiKey.isEmpty ? nil : trimmedApiKey
     settings.geminiSystemPrompt = geminiSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }

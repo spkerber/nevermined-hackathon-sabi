@@ -28,6 +28,11 @@ struct AvailableJobsResponse: Codable {
   let jobs: [AvailableJob]
 }
 
+struct SignupResponse: Codable {
+  let apiKey: String
+  let userId: String
+}
+
 struct JobStatusResponse: Codable {
   let status: String
   let job: VerificationJobResponse
@@ -53,6 +58,28 @@ class SabiAPIClient: ObservableObject {
 
   private var baseURL: String { SabiConfig.url }
 
+  /// Ensures we have a valid API key, auto-signing up if needed.
+  func ensureAuthenticated() async throws {
+    if let key = SettingsManager.shared.sabiApiKey, !key.isEmpty { return }
+
+    let agentId = "verifier_\(UUID().uuidString.prefix(12).lowercased())"
+    let url = URL(string: "\(baseURL)/api/auth/signup")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONSerialization.data(withJSONObject: ["nvmAgentId": agentId])
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+      let body = String(data: data, encoding: .utf8) ?? ""
+      throw SabiAPIError.apiError("Auto-signup failed: \(body.prefix(200))")
+    }
+
+    let result = try JSONDecoder().decode(SignupResponse.self, from: data)
+    SettingsManager.shared.sabiApiKey = result.apiKey
+    NSLog("[SabiAPI] Auto-signup complete, API key saved")
+  }
+
   private func addAuth(_ request: inout URLRequest) {
     if let apiKey = SettingsManager.shared.sabiApiKey {
       request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -61,6 +88,7 @@ class SabiAPIClient: ObservableObject {
 
   // List available verification jobs
   func listAvailableJobs() async throws -> [AvailableJob] {
+    try await ensureAuthenticated()
     let urlString = "\(baseURL)/api/verifications"
     NSLog("[SabiAPI] listAvailableJobs → %@", urlString)
     var request = URLRequest(url: URL(string: urlString)!)
@@ -79,6 +107,7 @@ class SabiAPIClient: ObservableObject {
 
   // Seed dummy jobs for demo
   func seedJobs() async throws {
+    try await ensureAuthenticated()
     var request = URLRequest(url: URL(string: "\(baseURL)/api/seed")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -93,6 +122,7 @@ class SabiAPIClient: ObservableObject {
 
   // List jobs for a verifier (their history)
   func listMyVerifications(verifierId: String) async throws -> [AvailableJob] {
+    try await ensureAuthenticated()
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications?verifierId=\(verifierId)")!)
     request.httpMethod = "GET"
     addAuth(&request)
@@ -109,6 +139,7 @@ class SabiAPIClient: ObservableObject {
 
   // Cancel a verification job (returns it to available)
   func cancelJob(jobId: String) async throws {
+    try await ensureAuthenticated()
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)/cancel")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -123,6 +154,7 @@ class SabiAPIClient: ObservableObject {
 
   // Accept a verification job
   func acceptJob(jobId: String, verifierId: String) async throws {
+    try await ensureAuthenticated()
     isLoading = true
     error = nil
     statusMessage = "Accepting job..."
@@ -146,6 +178,7 @@ class SabiAPIClient: ObservableObject {
 
   // Start a verification session
   func startSession(jobId: String) async throws {
+    try await ensureAuthenticated()
     isLoading = true
     statusMessage = "Starting session..."
 
@@ -170,6 +203,7 @@ class SabiAPIClient: ObservableObject {
     jobId: String,
     onProgress: @escaping (Int) -> Void
   ) async throws {
+    try await ensureAuthenticated()
     for (index, frame) in frames.enumerated() {
       guard let jpegData = frame.image.jpegData(compressionQuality: 0.7) else { continue }
 
@@ -190,6 +224,7 @@ class SabiAPIClient: ObservableObject {
 
   // End a verification session
   func endSession(jobId: String, answer: String, transcript: String? = nil) async throws {
+    try await ensureAuthenticated()
     isLoading = true
     statusMessage = "Submitting answer..."
 
@@ -216,6 +251,7 @@ class SabiAPIClient: ObservableObject {
 
   // Get job status
   func getJobStatus(jobId: String) async throws -> JobStatusResponse {
+    try await ensureAuthenticated()
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)")!)
     request.httpMethod = "GET"
     addAuth(&request)
