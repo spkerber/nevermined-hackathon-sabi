@@ -24,6 +24,7 @@ Secrets and config are managed via **Doppler** in CI/deploy; for local dev you c
 |----------|-------------|
 | `PORT` | Server port (default 3000) |
 | `APP_URL` | **Public base URL of your deployed seller** — our backend: `https://sabi-backend.ben-imadali.workers.dev`. No trailing slash. Nevermined and the hackathon marketplace use this; the buyer endpoint is `APP_URL/query`. |
+| `REMOTION_API_KEY` | Remotion API key (for demo-video cloud render or team features) | [Remotion](https://remotion.dev) → Account. Optional; local Studio and render work without it. |
 
 ### Using your Cloudflare deployment URL
 
