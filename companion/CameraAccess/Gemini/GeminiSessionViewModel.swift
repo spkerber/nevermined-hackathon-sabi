@@ -184,9 +184,9 @@ class GeminiSessionViewModel: ObservableObject {
       return
     }
 
-    // Send the verification question to Gemini so it knows what to look for
+    // Send the verification question — remind Gemini to stay passive
     if let question = verificationSession.question {
-      geminiService.sendTextMessage("The verification question is: \(question). Please observe through the camera and help me answer this.")
+      geminiService.sendTextMessage("The verification question is: \(question). Wait for the verifier to speak — do not describe what you see or try to answer on your own.")
     }
 
     // Start mic capture
