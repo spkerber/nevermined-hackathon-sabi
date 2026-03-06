@@ -94,8 +94,13 @@ export async function getArtifact(jobId: string) {
   return handleResponse(res);
 }
 
-export function getFrameUrl(path: string) {
-  return `${API_BASE}${path}`;
+export function getFrameUrl(pathOrUrl: string) {
+  // Backend may return full URL; use as-is. Otherwise prepend API_BASE for relative paths.
+  if (!pathOrUrl) return pathOrUrl;
+  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://") || pathOrUrl.startsWith("//")) {
+    return pathOrUrl;
+  }
+  return `${API_BASE}${pathOrUrl}`;
 }
 
 export async function archiveVerification(jobId: string) {
