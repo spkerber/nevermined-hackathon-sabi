@@ -7,8 +7,7 @@ function corsHeaders(origin: string | null): HeadersInit {
   return {
     "Access-Control-Allow-Origin": origin ?? "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, payment-signature, Upgrade",
-    "Access-Control-Expose-Headers": "payment-required, payment-response",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade",
   };
 }
 
@@ -37,12 +36,7 @@ export default {
 
     // ── GET /api/config ── Remote config for mobile app OTA updates
     if (url.pathname === "/api/config" && request.method === "GET") {
-      return json({
-        minAppVersion: "1.0.0",
-        latestAppVersion: "1.0.0",
-        apiBaseUrl: url.origin,
-        features: {},
-      }, 200, cors);
+      return json({ apiBaseUrl: url.origin }, 200, cors);
     }
 
     // Route WebSocket connections to agents (path: /agents/verification-agent/:id)

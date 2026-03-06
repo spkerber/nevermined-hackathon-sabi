@@ -5,7 +5,6 @@ struct StreamView: View {
   @ObservedObject var viewModel: StreamSessionViewModel
   @ObservedObject var wearablesVM: WearablesViewModel
   @ObservedObject var geminiVM: GeminiSessionViewModel
-  @ObservedObject var webrtcVM: WebRTCSessionViewModel
   var onCancelled: (() -> Void)?
   @State private var showVerificationComplete = false
   @State private var isCancelling = false

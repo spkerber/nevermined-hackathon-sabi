@@ -7,7 +7,6 @@ struct SettingsView: View {
   @State private var geminiAPIKey: String = ""
   @State private var workerURL: String = ""
   @State private var geminiSystemPrompt: String = ""
-  @State private var webrtcSignalingURL: String = ""
   @State private var showResetConfirmation = false
 
   var body: some View {
@@ -42,19 +41,6 @@ struct SettingsView: View {
           TextEditor(text: $geminiSystemPrompt)
             .font(.system(.body, design: .monospaced))
             .frame(minHeight: 200)
-        }
-
-        Section(header: Text("WebRTC")) {
-          VStack(alignment: .leading, spacing: 4) {
-            Text("Signaling URL")
-              .font(.caption)
-              .foregroundColor(.secondary)
-            TextField("wss://your-server.example.com", text: $webrtcSignalingURL)
-              .autocapitalization(.none)
-              .disableAutocorrection(true)
-              .keyboardType(.URL)
-              .font(.system(.body, design: .monospaced))
-          }
         }
 
         Section {
@@ -99,13 +85,11 @@ struct SettingsView: View {
     geminiAPIKey = settings.geminiAPIKey
     workerURL = settings.workerURL
     geminiSystemPrompt = settings.geminiSystemPrompt
-    webrtcSignalingURL = settings.webrtcSignalingURL
   }
 
   private func save() {
     settings.geminiAPIKey = geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.workerURL = workerURL.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.geminiSystemPrompt = geminiSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    settings.webrtcSignalingURL = webrtcSignalingURL.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }

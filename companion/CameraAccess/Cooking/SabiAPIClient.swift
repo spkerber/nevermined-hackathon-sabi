@@ -212,41 +212,6 @@ class SabiAPIClient: ObservableObject {
     return try JSONDecoder().decode(JobStatusResponse.self, from: data)
   }
 
-  // Full verification flow: accept -> start -> upload frames -> end
-  func completeVerification(
-    session: VerificationSessionManager,
-    verifierId: String
-  ) async {
-    guard let jobId = session.jobId, let answer = session.answer else {
-      error = "Missing job ID or answer"
-      return
-    }
-
-    isLoading = true
-    error = nil
-
-    do {
-      // Upload frames
-      statusMessage = "Uploading photos (0/\(session.capturedFrames.count))..."
-      try await uploadFrames(frames: session.capturedFrames, jobId: jobId) { uploaded in
-        Task { @MainActor in
-          self.statusMessage = "Uploading photos (\(uploaded)/\(session.capturedFrames.count))..."
-        }
-      }
-
-      // End session with answer
-      statusMessage = "Submitting verification..."
-      try await endSession(jobId: jobId, answer: answer)
-
-      statusMessage = "Done!"
-    } catch {
-      self.error = error.localizedDescription
-      NSLog("[SabiAPI] Error: %@", error.localizedDescription)
-    }
-
-    isLoading = false
-  }
-
   enum SabiAPIError: LocalizedError {
     case apiError(String)
 

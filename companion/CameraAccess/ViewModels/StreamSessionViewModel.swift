@@ -60,9 +60,6 @@ class StreamSessionViewModel: ObservableObject {
   // Gemini Live integration
   var geminiSessionVM: GeminiSessionViewModel?
 
-  // WebRTC Live streaming integration
-  var webrtcSessionVM: WebRTCSessionViewModel?
-
   // The core DAT SDK StreamSession - handles all streaming operations
   private var streamSession: StreamSession
   // Listener tokens are used to manage DAT SDK event subscriptions
@@ -129,8 +126,6 @@ class StreamSessionViewModel: ObservableObject {
           }
           // Forward video frames to Gemini Live (throttled internally to ~1fps)
           self.geminiSessionVM?.sendVideoFrameIfThrottled(image: image)
-          // Forward video frames to WebRTC (no throttle — WebRTC handles bitrate)
-          self.webrtcSessionVM?.pushVideoFrame(image)
         }
       }
     }
@@ -223,7 +218,6 @@ class StreamSessionViewModel: ObservableObject {
           self.hasReceivedFirstFrame = true
         }
         self.geminiSessionVM?.sendVideoFrameIfThrottled(image: image)
-        self.webrtcSessionVM?.pushVideoFrame(image)
       }
     }
     camera.start()

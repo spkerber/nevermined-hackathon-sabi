@@ -10,7 +10,6 @@ final class SettingsManager {
     case geminiSystemPrompt
     case workerURL
     case workerToken
-    case webrtcSignalingURL
   }
 
   private init() {}
@@ -43,22 +42,10 @@ final class SettingsManager {
     set { defaults.set(newValue, forKey: Key.workerURL.rawValue) }
   }
 
-  var workerToken: String {
-    get { defaults.string(forKey: Key.workerToken.rawValue) ?? Secrets.workerToken }
-    set { defaults.set(newValue, forKey: Key.workerToken.rawValue) }
-  }
-
-  // MARK: - WebRTC
-
-  var webrtcSignalingURL: String {
-    get { defaults.string(forKey: Key.webrtcSignalingURL.rawValue) ?? Secrets.webrtcSignalingURL }
-    set { defaults.set(newValue, forKey: Key.webrtcSignalingURL.rawValue) }
-  }
-
   // MARK: - Reset
 
   func resetAll() {
-    for key in [Key.geminiAPIKey, .geminiSystemPrompt, .workerURL, .workerToken, .webrtcSignalingURL] {
+    for key in [Key.geminiAPIKey, .geminiSystemPrompt, .workerURL, .workerToken] {
       defaults.removeObject(forKey: key.rawValue)
     }
   }

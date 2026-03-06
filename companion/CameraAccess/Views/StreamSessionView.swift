@@ -7,7 +7,6 @@ struct StreamSessionView: View {
   @ObservedObject private var wearablesViewModel: WearablesViewModel
   @StateObject private var viewModel: StreamSessionViewModel
   @StateObject private var geminiVM = GeminiSessionViewModel()
-  @StateObject private var webrtcVM = WebRTCSessionViewModel()
   @StateObject private var apiClient = SabiAPIClient()
 
   let jobId: String
@@ -26,14 +25,13 @@ struct StreamSessionView: View {
   var body: some View {
     ZStack {
       if viewModel.isStreaming {
-        StreamView(viewModel: viewModel, wearablesVM: wearablesViewModel, geminiVM: geminiVM, webrtcVM: webrtcVM, onCancelled: onCancelled)
+        StreamView(viewModel: viewModel, wearablesVM: wearablesViewModel, geminiVM: geminiVM, onCancelled: onCancelled)
       } else {
         NonStreamView(viewModel: viewModel, wearablesVM: wearablesViewModel)
       }
     }
     .task {
       viewModel.geminiSessionVM = geminiVM
-      viewModel.webrtcSessionVM = webrtcVM
       geminiVM.streamingMode = viewModel.streamingMode
 
       // Configure the verification session with the accepted job
