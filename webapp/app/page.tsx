@@ -277,9 +277,31 @@ export default function Home() {
             </div>
 
             {(planId || agentId) && (
-              <div className="text-xs text-zinc-500 space-y-1 bg-zinc-800/50 rounded p-3">
-                {planId && <p>Plan ID: <span className="text-zinc-300 font-mono">{planId}</span></p>}
-                {agentId && <p>Agent ID: <span className="text-zinc-300 font-mono">{agentId}</span></p>}
+              <div className="text-xs text-zinc-500 space-y-2 bg-zinc-800/50 rounded p-3">
+                {planId && (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="min-w-0">Plan ID: <span className="text-zinc-300 font-mono">{planId.slice(0, 16)}...{planId.slice(-8)}</span></p>
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard.writeText(planId); }}
+                      className="shrink-0 text-indigo-400 hover:text-indigo-300 transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
+                {agentId && (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="min-w-0">Service Agent ID: <span className="text-zinc-300 font-mono">{agentId.slice(0, 16)}...{agentId.slice(-8)}</span></p>
+                    <button
+                      type="button"
+                      onClick={() => { navigator.clipboard.writeText(agentId); }}
+                      className="shrink-0 text-indigo-400 hover:text-indigo-300 transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
