@@ -45,12 +45,24 @@ struct VerificationJobView: View {
         .padding(.bottom, 12)
 
         // Tab picker
-        Picker("", selection: $selectedTab) {
+        HStack(spacing: 0) {
           ForEach(JobTab.allCases, id: \.self) { tab in
-            Text(tab.rawValue).tag(tab)
+            Button {
+              selectedTab = tab
+            } label: {
+              Text(tab.rawValue)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(selectedTab == tab ? .black : .white.opacity(0.6))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(selectedTab == tab ? Color.white : Color.white.opacity(0.1))
+                .cornerRadius(8)
+            }
           }
         }
-        .pickerStyle(.segmented)
+        .padding(3)
+        .background(Color.white.opacity(0.1))
+        .cornerRadius(10)
         .padding(.horizontal, 20)
         .padding(.bottom, 16)
 

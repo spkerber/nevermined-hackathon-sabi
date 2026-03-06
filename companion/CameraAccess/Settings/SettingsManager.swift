@@ -31,6 +31,13 @@ final class SettingsManager {
   var workerURL: String {
     get {
       let saved = defaults.string(forKey: Key.workerURL.rawValue)
+      // If the cached URL points to ngrok, localhost, or a LAN IP, fall back to the compiled default
+      if let saved,
+         saved.contains("ngrok") || saved.contains("localhost") || saved.contains("127.0.0.1") ||
+         saved.contains("192.168.") || saved.contains("172.") || saved.contains("10.") {
+        defaults.removeObject(forKey: Key.workerURL.rawValue)
+        return Secrets.workerURL
+      }
       return saved ?? Secrets.workerURL
     }
     set { defaults.set(newValue, forKey: Key.workerURL.rawValue) }

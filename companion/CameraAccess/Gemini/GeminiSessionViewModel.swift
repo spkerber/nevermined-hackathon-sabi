@@ -12,6 +12,8 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var wasInterrupted: Bool = false
   /// Full conversation log accumulated across all turns
   @Published var fullTranscript: String = ""
+  /// Tracks whether the last transcript entry was from the user (to coalesce fragments)
+  private var lastTranscriptSpeaker: String = ""
 
   let verificationSession = VerificationSessionManager()
 
@@ -39,6 +41,7 @@ class GeminiSessionViewModel: ObservableObject {
     isGeminiActive = true
     wasInterrupted = false
     fullTranscript = ""
+    lastTranscriptSpeaker = ""
     verificationSession.startSession()
 
     // Handle audio interruptions (e.g. incoming phone call)
@@ -78,8 +81,14 @@ class GeminiSessionViewModel: ObservableObject {
       Task { @MainActor in
         // Log completed AI turn to full transcript
         if !self.aiTranscript.isEmpty {
-          self.fullTranscript += "AI: \(self.aiTranscript)\n"
+          if self.lastTranscriptSpeaker == "AI" {
+            self.fullTranscript += self.aiTranscript
+          } else {
+            self.fullTranscript += "\nAI: \(self.aiTranscript)"
+          }
+          self.lastTranscriptSpeaker = "AI"
         }
+        self.fullTranscript += "\n"
         self.userTranscript = ""
       }
     }
@@ -89,12 +98,16 @@ class GeminiSessionViewModel: ObservableObject {
       Task { @MainActor in
         // When user starts speaking, log any pending AI transcript
         if self.userTranscript.isEmpty && !self.aiTranscript.isEmpty {
-          // AI transcript was already logged on turnComplete
           self.aiTranscript = ""
         }
         self.userTranscript += text
-        // Log user speech to full transcript
-        self.fullTranscript += "User: \(text)\n"
+        // Coalesce consecutive user fragments into one "User:" line
+        if self.lastTranscriptSpeaker == "User" {
+          self.fullTranscript += text
+        } else {
+          self.fullTranscript += "\nUser: \(text)"
+          self.lastTranscriptSpeaker = "User"
+        }
       }
     }
 
