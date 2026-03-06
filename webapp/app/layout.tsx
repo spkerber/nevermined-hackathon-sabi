@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const ibmPlexSans = IBM_Plex_Sans({
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-ibm-plex-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ["400", "500", "600"],
+  variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
 });
 
@@ -23,10 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-950 text-zinc-100 min-h-screen`}
-      >
+    <html lang="en" className={`${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
+      <body className="antialiased bg-sabi-bg text-sabi-text min-h-screen">
         {children}
       </body>
     </html>
