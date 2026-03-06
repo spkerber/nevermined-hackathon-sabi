@@ -30,7 +30,52 @@ curl -s -X POST https://sabi-backend.ben-imadali.workers.dev/api/verifications \
 # => HTTP 402, payment-required header contains base64-encoded plan info
 ```
 
-Decode the `payment-required` header to get the `planId` and `agentId`. Use these to purchase a plan and obtain an access token from Nevermined.
+Decode the `payment-required` header to get the `planId` and `agentId`:
+
+```bash
+# The payment-required header is base64-encoded JSON
+echo "<payment-required-header>" | base64 -d
+# => {"x402Version":2,"accepts":[{"planId":"did:nv:...","extra":{"agentId":"did:nv:..."}}],...}
+```
+
+### Getting an access token
+
+You need a Nevermined API key. Get one at https://sandbox.nevermined.app (or https://nevermined.app for production).
+
+**Option A: Using the Nevermined JS SDK (`@nevermined-io/payments`)**
+
+```javascript
+import { Payments } from "@nevermined-io/payments";
+
+const payments = Payments.getInstance({
+  nvmApiKey: "<your-nvm-api-key>",
+  environment: "sandbox", // or "live"
+});
+
+// Order the plan (only needed once, idempotent)
+await payments.plans.orderPlan("<planId>");
+
+// Get the access token
+const { accessToken } = await payments.x402.getX402AccessToken("<planId>", "<agentId>");
+// Use accessToken as the payment-signature header
+```
+
+**Option B: Using the Nevermined REST API directly**
+
+```bash
+# 1. Order the plan (once)
+curl -s -X POST https://api.sandbox.nevermined.app/api/v1/payments/plans/<planId>/order \
+  -H "Authorization: Bearer <your-nvm-api-key>"
+
+# 2. Get x402 access token
+curl -s -X POST https://api.sandbox.nevermined.app/api/v1/x402/permissions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-nvm-api-key>" \
+  -d '{"accepted":{"scheme":"nvm:erc4337","network":"eip155:84532","planId":"<planId>","extra":{"agentId":"<agentId>"}}}'
+# => {"accessToken": "..."}
+```
+
+Replace `sandbox` with `app` in the URLs for production.
 
 Then retry with the access token:
 

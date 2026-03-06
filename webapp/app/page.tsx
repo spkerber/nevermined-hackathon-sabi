@@ -244,18 +244,36 @@ export default function Home() {
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-zinc-200">Payment Required</h3>
               <p className="text-sm text-zinc-400">
-                This verification costs 1 credit. Obtain an access token from Nevermined, then paste it below.
+                This verification costs 1 credit. To get an access token:
               </p>
-              {nvmConfig && (
-                <a
-                  href={getNvmAppUrl(nvmConfig.nvmEnvironment)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block text-sm text-indigo-400 hover:text-indigo-300 underline"
-                >
-                  Open Nevermined App
-                </a>
-              )}
+              <ol className="text-sm text-zinc-400 list-decimal list-inside space-y-1">
+                <li>
+                  Sign in to{" "}
+                  {nvmConfig ? (
+                    <a
+                      href={getNvmAppUrl(nvmConfig.nvmEnvironment)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-400 hover:text-indigo-300 underline"
+                    >
+                      Nevermined
+                    </a>
+                  ) : (
+                    <span className="text-zinc-300">Nevermined</span>
+                  )}{" "}
+                  and get your NVM API key
+                </li>
+                <li>Order the plan using the Plan ID below</li>
+                <li>Request an x402 access token (via SDK or REST API)</li>
+                <li>Paste the token below</li>
+              </ol>
+              <p className="text-xs text-zinc-500">
+                See the{" "}
+                <a href="/docs" target="_blank" className="text-indigo-400 hover:text-indigo-300 underline">
+                  docs
+                </a>{" "}
+                for detailed instructions.
+              </p>
             </div>
 
             {(planId || agentId) && (

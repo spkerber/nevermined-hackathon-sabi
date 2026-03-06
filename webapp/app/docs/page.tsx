@@ -83,9 +83,57 @@ curl -X POST ${API_BASE}/api/verifications \\
         </pre>
         <p className="text-zinc-500 text-sm mt-2">
           Payment uses the x402 protocol. The 402 response includes a{" "}
-          <code className="text-zinc-300">payment-required</code> header with plan
-          details. Obtain an access token from Nevermined and send it via{" "}
-          <code className="text-zinc-300">payment-signature</code> header.
+          <code className="text-zinc-300">payment-required</code> header (base64
+          JSON with <code className="text-zinc-300">planId</code> and{" "}
+          <code className="text-zinc-300">agentId</code>).
+        </p>
+
+        <h3 className="text-sm font-semibold text-zinc-400 mt-6 mb-2">
+          How to get an access token
+        </h3>
+        <p className="text-zinc-500 text-sm mb-3">
+          You need a Nevermined API key. Get one at{" "}
+          <a href="https://sandbox.nevermined.app" target="_blank" rel="noopener noreferrer" className="text-zinc-300 underline underline-offset-2">
+            sandbox.nevermined.app
+          </a>{" "}
+          (or{" "}
+          <a href="https://nevermined.app" target="_blank" rel="noopener noreferrer" className="text-zinc-300 underline underline-offset-2">
+            nevermined.app
+          </a>{" "}
+          for production).
+        </p>
+
+        <p className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-2">Using the JS SDK</p>
+        <pre className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-sm overflow-x-auto mb-4">
+          <code>{`import { Payments } from "@nevermined-io/payments";
+
+const payments = Payments.getInstance({
+  nvmApiKey: "<your-nvm-api-key>",
+  environment: "sandbox",
+});
+
+await payments.plans.orderPlan("<planId>");
+const { accessToken } = await payments.x402
+  .getX402AccessToken("<planId>", "<agentId>");`}</code>
+        </pre>
+
+        <p className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-2">Using curl</p>
+        <pre className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-sm overflow-x-auto">
+          <code>{`# 1. Order the plan (once)
+curl -s -X POST https://api.sandbox.nevermined.app/api/v1/payments/plans/<planId>/order \\
+  -H "Authorization: Bearer <your-nvm-api-key>"
+
+# 2. Get x402 access token
+curl -s -X POST https://api.sandbox.nevermined.app/api/v1/x402/permissions \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer <your-nvm-api-key>" \\
+  -d '{"accepted":{"scheme":"nvm:erc4337","network":"eip155:84532","planId":"<planId>","extra":{"agentId":"<agentId>"}}}'
+# => {"accessToken": "..."}`}</code>
+        </pre>
+        <p className="text-zinc-500 text-sm mt-2">
+          Use the returned <code className="text-zinc-300">accessToken</code> as
+          the <code className="text-zinc-300">payment-signature</code> header in
+          the verification request above.
         </p>
       </section>
 
