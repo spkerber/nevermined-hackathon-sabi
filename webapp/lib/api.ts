@@ -15,6 +15,23 @@ export async function createVerification(params: {
   return res.json();
 }
 
+export async function listMyVerifications(requesterId: string) {
+  const res = await fetch(
+    `${API_BASE}/api/verifications?requesterId=${encodeURIComponent(requesterId)}`
+  );
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json() as Promise<{
+    jobs: {
+      id: string;
+      question: string;
+      category: string;
+      status: string;
+      payout: number;
+      createdAt?: number;
+    }[];
+  }>;
+}
+
 export async function getVerificationStatus(jobId: string) {
   const res = await fetch(`${API_BASE}/api/verifications/${jobId}`);
   if (!res.ok) throw new Error((await res.json()).error);

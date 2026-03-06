@@ -39,20 +39,37 @@ export default {
       return json({ status: "ok", timestamp: Date.now() }, 200, cors);
     }
 
-    // ── GET /api/verifications ── List available verification jobs
+    // ── GET /api/verifications ── List verification jobs
+    // ?requesterId=X  → all jobs for that requester (any status)
+    // no param         → available jobs (connecting only, for verifiers)
     if (url.pathname === "/api/verifications" && request.method === "GET") {
       try {
+        const requesterId = url.searchParams.get("requesterId");
         const { keys } = await env.JOB_REGISTRY.list();
         const jobs = [];
         for (const key of keys) {
           const meta = await env.JOB_REGISTRY.get(key.name, "json") as {
             id: string; question: string; category: string;
             targetLat: number; targetLng: number; status: string;
-            payout: number;
+            payout: number; requesterId?: string;
+            createdAt?: number;
           } | null;
-          if (meta && meta.status === "connecting") {
-            jobs.push(meta);
+          if (!meta) continue;
+          if (requesterId) {
+            // Requester dashboard: show all their jobs
+            if (meta.requesterId === requesterId) {
+              jobs.push(meta);
+            }
+          } else {
+            // Verifier feed: only show available jobs
+            if (meta.status === "connecting") {
+              jobs.push(meta);
+            }
           }
+        }
+        // Sort by newest first for requester dashboard
+        if (requesterId) {
+          jobs.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
         }
         return json({ jobs }, 200, cors);
       } catch (err) {
@@ -99,6 +116,8 @@ export default {
           targetLng: body.targetLng,
           status: "connecting",
           payout: body.payout ?? 5,
+          requesterId: body.requesterId ?? "anonymous",
+          createdAt: Date.now(),
         }));
 
         return json({
@@ -165,6 +184,8 @@ export default {
             targetLng: dummy.targetLng,
             status: "connecting",
             payout: 5,
+            requesterId: "demo-requester",
+            createdAt: Date.now(),
           }));
 
           created.push(job);
@@ -250,8 +271,15 @@ export default {
     const startMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/start$/);
     if (startMatch && request.method === "POST") {
       try {
-        const agent = await getAgentByName(env.VerificationAgent, startMatch[1]);
+        const jobId = startMatch[1];
+        const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.startSession();
+
+        const existing = await env.JOB_REGISTRY.get(jobId, "json") as Record<string, unknown> | null;
+        if (existing) {
+          await env.JOB_REGISTRY.put(jobId, JSON.stringify({ ...existing, status: "in_progress" }));
+        }
+
         return json(result, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
@@ -284,9 +312,17 @@ export default {
     const endMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/end$/);
     if (endMatch && request.method === "POST") {
       try {
+        const jobId = endMatch[1];
         const body = await request.json() as { answer: string };
-        const agent = await getAgentByName(env.VerificationAgent, endMatch[1]);
+        const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.endSession(body.answer);
+
+        // Update KV registry status
+        const existing = await env.JOB_REGISTRY.get(jobId, "json") as Record<string, unknown> | null;
+        if (existing) {
+          await env.JOB_REGISTRY.put(jobId, JSON.stringify({ ...existing, status: "verified" }));
+        }
+
         return json(result, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);

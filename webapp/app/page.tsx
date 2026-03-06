@@ -1,28 +1,101 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createVerification } from "@/lib/api";
+import Link from "next/link";
+import { createVerification, listMyVerifications } from "@/lib/api";
+import { validateQuestion } from "@/lib/validate-question";
+
+interface MyJob {
+  id: string;
+  question: string;
+  category: string;
+  status: string;
+  payout: number;
+  createdAt?: number;
+}
+
+const STATUS_STYLES: Record<string, { label: string; color: string }> = {
+  connecting: { label: "Waiting", color: "bg-amber-500" },
+  accepted: { label: "Accepted", color: "bg-indigo-500" },
+  in_progress: { label: "In Progress", color: "bg-blue-500" },
+  verified: { label: "Verified", color: "bg-emerald-500" },
+  cancelled: { label: "Cancelled", color: "bg-zinc-500" },
+};
+
+function getRequesterId(): string {
+  if (typeof window === "undefined") return "anonymous";
+  let id = localStorage.getItem("sabi_requester_id");
+  if (!id) {
+    id = `req_${crypto.randomUUID().slice(0, 8)}`;
+    localStorage.setItem("sabi_requester_id", id);
+  }
+  return id;
+}
 
 export default function Home() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [validationHint, setValidationHint] = useState("");
+  const [suggestion, setSuggestion] = useState("");
+  const [myJobs, setMyJobs] = useState<MyJob[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+
+  const requesterId = typeof window !== "undefined" ? getRequesterId() : "anonymous";
+
+  const loadMyJobs = useCallback(async () => {
+    try {
+      const result = await listMyVerifications(requesterId);
+      setMyJobs(result.jobs);
+    } catch {
+      // silently fail
+    }
+    setLoadingJobs(false);
+  }, [requesterId]);
+
+  useEffect(() => {
+    loadMyJobs();
+  }, [loadMyJobs]);
+
+  // Live validation as user types
+  useEffect(() => {
+    if (!question.trim()) {
+      setValidationHint("");
+      setSuggestion("");
+      return;
+    }
+    const result = validateQuestion(question);
+    if (!result.valid) {
+      setValidationHint(result.error ?? "");
+      setSuggestion(result.suggestion ?? "");
+    } else {
+      setValidationHint("");
+      setSuggestion("");
+    }
+  }, [question]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!question.trim()) return;
+    const trimmed = question.trim();
+    if (!trimmed) return;
+
+    const validation = validateQuestion(trimmed);
+    if (!validation.valid) {
+      setError(validation.error ?? "Invalid question");
+      return;
+    }
 
     setLoading(true);
     setError("");
 
     try {
       const result = await createVerification({
-        question: question.trim(),
+        question: trimmed,
         targetLat: 37.7749,
         targetLng: -122.4194,
-        requesterId: "demo-requester",
+        requesterId,
       });
       router.push(`/verify/${result.job.id}`);
     } catch (err) {
@@ -32,8 +105,10 @@ export default function Home() {
     }
   }
 
+  const isValid = question.trim().length > 0 && validateQuestion(question.trim()).valid;
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6">
+    <main className="flex min-h-screen flex-col items-center p-6">
       <div className="w-full max-w-lg space-y-8">
         <div className="text-center space-y-3">
           <h1 className="text-4xl font-bold tracking-tight">Sabi</h1>
@@ -51,10 +126,24 @@ export default function Home() {
               id="question"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder='e.g. "How many Fantas are left in the vending machine at 123 Main St?"'
+              placeholder='e.g. "Is the coffee shop on 5th Ave currently open?"'
               rows={3}
               className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
             />
+            {validationHint && (
+              <div className="mt-2 space-y-1">
+                <p className="text-amber-400 text-sm">{validationHint}</p>
+                {suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setQuestion(suggestion)}
+                    className="text-indigo-400 text-sm hover:text-indigo-300 transition-colors"
+                  >
+                    Did you mean: &ldquo;{suggestion}&rdquo;
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -63,7 +152,7 @@ export default function Home() {
 
           <button
             type="submit"
-            disabled={loading || !question.trim()}
+            disabled={loading || !isValid}
             className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Submitting..." : "Request Verification — $5"}
@@ -73,6 +162,54 @@ export default function Home() {
         <p className="text-center text-xs text-zinc-500">
           A nearby verifier with Ray-Ban Metas will go check and send you photo evidence + a vocal answer.
         </p>
+
+        {/* My Verifications */}
+        <div className="space-y-4 pt-4 border-t border-zinc-800">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">My Verifications</h2>
+            <button
+              onClick={loadMyJobs}
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {loadingJobs ? (
+            <div className="text-center py-8">
+              <p className="text-zinc-500 text-sm">Loading...</p>
+            </div>
+          ) : myJobs.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-zinc-500 text-sm">No verifications yet. Submit a question above to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {myJobs.map((job) => {
+                const style = STATUS_STYLES[job.status] ?? { label: job.status, color: "bg-zinc-600" };
+                return (
+                  <Link
+                    key={job.id}
+                    href={`/verify/${job.id}`}
+                    className="block rounded-lg border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm text-zinc-200 line-clamp-2 flex-1">{job.question}</p>
+                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium text-white ${style.color}`}>
+                        {style.label}
+                      </span>
+                    </div>
+                    {job.createdAt && (
+                      <p className="text-xs text-zinc-600 mt-2">
+                        {new Date(job.createdAt).toLocaleString()}
+                      </p>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
