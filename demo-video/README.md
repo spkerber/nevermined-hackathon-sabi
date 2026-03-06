@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-**Remotion API key (optional):** For cloud rendering or team features, add `REMOTION_API_KEY` to Doppler (or `.env`). The CLI works without it for local Studio and render.
+**Remotion is free for individuals** ([remotion.dev/docs](https://www.remotion.dev/docs)). Local Studio and render work out of the box. `REMOTION_API_KEY` is only needed for cloud rendering (Lambda) or team features.
 
 Opens Remotion Studio. The composition uses **placeholders** by default (no video files needed). Toggle `usePlaceholders` to `false` in the Props panel once you have real assets.
 
