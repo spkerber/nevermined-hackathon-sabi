@@ -191,7 +191,9 @@ struct VerificationJobView: View {
     } else {
       LazyVStack(spacing: 12) {
         ForEach(myJobs) { job in
-          HistoryJobCard(job: job)
+          HistoryJobCard(job: job, onResume: (job.status == "in_progress" || job.status == "accepted") ? {
+            Task { await resumeJob(job) }
+          } : nil)
         }
       }
       .padding(.horizontal, 20)
@@ -285,6 +287,19 @@ struct VerificationJobView: View {
       }
     }
     acceptingJobId = nil
+  }
+
+  private func resumeJob(_ job: AvailableJob) async {
+    errorMessage = nil
+    do {
+      // Only call startSession if the job is still in accepted state
+      if job.status == "accepted" {
+        try await apiClient.startSession(jobId: job.id)
+      }
+      onJobAccepted(job.id, job.question)
+    } catch {
+      errorMessage = error.localizedDescription
+    }
   }
 
   private func distanceString(to job: AvailableJob) -> String {
@@ -396,6 +411,7 @@ private struct JobCard: View {
 
 private struct HistoryJobCard: View {
   let job: AvailableJob
+  let onResume: (() -> Void)?
 
   private var statusColor: Color {
     switch job.status {
@@ -447,9 +463,25 @@ private struct HistoryJobCard: View {
         .foregroundColor(.white)
         .lineLimit(2)
 
-      Text(job.category)
-        .font(.system(size: 12))
-        .foregroundColor(.white.opacity(0.5))
+      HStack {
+        Text(job.category)
+          .font(.system(size: 12))
+          .foregroundColor(.white.opacity(0.5))
+
+        Spacer()
+
+        if let onResume, job.status == "in_progress" || job.status == "accepted" {
+          Button(action: onResume) {
+            Text("Resume")
+              .font(.system(size: 13, weight: .bold))
+              .foregroundColor(.black)
+              .padding(.horizontal, 16)
+              .padding(.vertical, 6)
+              .background(Color.blue)
+              .cornerRadius(6)
+          }
+        }
+      }
     }
     .padding(16)
     .background(Color.white.opacity(0.08))
