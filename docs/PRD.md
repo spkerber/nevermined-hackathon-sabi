@@ -110,7 +110,7 @@ Sabi uses **multiple agents** for selling, buying, onboarding, order-help, and t
 - **Requester journey:** Submit verification question + target location -> pay with Nevermined credits -> wait for verifier match -> receive artifact (photos + answer) -> review in webapp.
 - **Verifier journey:** Receive nearby job notification (question summary, pay, distance) -> accept or decline -> receive detailed instructions -> use voice to start verification session on Ray-Ban Metas -> go to location, observe, answer question vocally -> end session vocally -> job complete, credits received.
 - **Backend:** Verification service that (1) accepts paid verification requests, (2) matches to nearby verifiers by geolocation, (3) manages session lifecycle, (4) captures photos from Ray-Ban Meta stream (1 photo / 5 seconds), (5) transcribes vocal answer, (6) assembles and delivers artifact.
-- **Ray-Ban Meta integration via companion app:** A forked version of [VisionClaw](https://github.com/nicholasgoulding/VisionClaw) runs on the verifier's iPhone, paired with their Ray-Ban Metas. When the verifier starts a verification session, the app programmatically captures 1 photo every 5 seconds from the glasses' camera stream and uploads them. Capture stops automatically when the session ends (i.e. the verifier has answered the core question). Transcription of the verifier's vocal answer uses VisionClaw's built-in transcription capabilities.
+- **Ray-Ban Meta integration via companion app:** A fork of the **ray-banned** app (`~/Projects/ray-banned`) runs on the verifier's iPhone, paired with Ray-Ban Metas via Meta DAT SDK. When the verifier starts a verification session, the app programmatically captures 1 photo every 5 seconds (pattern adapted from ray-banned's `captureFrameIfNeeded()` in `CookingSessionManager`). Capture stops when the session ends. Transcription uses **Gemini 2.5 Flash** native audio via WebSocket (same as ray-banned: iPhone mic → 16kHz PCM → Gemini → transcribed answer).
 - **Artifact:** A bundle containing (1) the original question, (2) the transcribed vocal answer, (3) timestamped photos captured during the session. Reviewable in a webapp as a step-through slideshow with the answer displayed.
 - **Job status lifecycle:** Each verification job has a status visible to the requester: `connecting` (seeking a verifier) -> `rejected` (a verifier explicitly declined; job may be re-offered to next verifier) -> `accepted` (verifier took the job) -> `in_progress` (verification session active) -> `verified` (session complete, artifact ready) or `cancelled` / `abandoned` (verifier ended the job after acceptance but before completion). Requester sees real-time status updates.
 - **Refunds:** When a job is `rejected` (verifier declined before starting) or `cancelled`/`abandoned` (verifier ended after accept, before completion), the requester is refunded. V1: Sabi absorbs the cost of failed orders and labor (no charge to requester; verifier not paid for abandoned jobs). Post-V1: implement Nevermined reversal/refund flows as needed.
@@ -123,8 +123,8 @@ Sabi uses **multiple agents** for selling, buying, onboarding, order-help, and t
 - Job offer to verifier: shows pay amount, distance to target, question summary. Verifier can accept or decline.
 - Detailed instructions delivered to verifier on acceptance.
 - Voice-initiated verification session on Ray-Ban Metas.
-- Programmatic photo capture: companion app (VisionClaw fork on iPhone) captures 1 photo every 5 seconds from Ray-Ban Meta stream. Starts automatically when session begins, stops when session ends.
-- Vocal answer capture: verifier speaks the answer to the verification question; transcribed using VisionClaw's built-in transcription.
+- Programmatic photo capture: companion app (ray-banned fork on iPhone, Meta DAT SDK) captures 1 photo every 5 seconds from Ray-Ban Meta stream via `streamSession.capturePhoto()`; pattern from ray-banned's `captureFrameIfNeeded()`. Starts when session begins, stops when session ends. Photos uploaded to Cloudflare R2.
+- Vocal answer capture: verifier speaks the answer; iPhone mic (AVAudioEngine) → 16kHz PCM → Gemini 2.5 Flash WebSocket → transcribed answer (same as ray-banned).
 - Job status lifecycle: `connecting` -> `rejected` (optional) -> `accepted` -> `in_progress` -> `verified` or `cancelled`/`abandoned`, visible to requester in real-time.
 - Verifier can decline a job with optional reason (e.g. too far, too difficult, can't access, unsafe, illicit); can abandon after accept with reason. Refund to requester; V1 Sabi absorbs cost.
 - Artifact assembly: question + transcribed answer + timestamped photos.
@@ -353,8 +353,8 @@ Worker (fetch handler):
 | Risk | Mitigation |
 |------|------------|
 | Nevermined integration delay | Follow 5-min setup and seller-simple-agent pattern; start with one endpoint. |
-| VisionClaw fork complexity | Start with minimal changes (add job management + photo timer); VisionClaw already handles Ray-Ban Meta pairing and transcription. |
-| Voice transcription accuracy | VisionClaw's built-in transcription handles this; allow verifier to review/correct answer before submission if needed. |
+| ray-banned / VisionClaw fork complexity | Start with minimal changes (add job management + photo timer); ray-banned already has DAT SDK pairing, 5s capture pattern, and Gemini transcription. |
+| Voice transcription accuracy | Gemini 2.5 Flash WebSocket handles transcription; allow verifier to review/correct answer before submission if needed. |
 | Geolocation accuracy indoors | V1 at hackathon venue; use coarse matching (same building/floor). |
 | Photo upload bandwidth | 1 photo / 5s is modest; compress images before upload. |
 | Scope creep (fork + matching + refunds) | Strict V1: two verifiers only; defer automated refund flows; Sabi absorbs cost for reject/abandon. |
