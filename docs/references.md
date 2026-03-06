@@ -1,5 +1,14 @@
 # References
 
+## Deployed URLs
+
+| Component | URL |
+|-----------|-----|
+| **Webapp (Vercel)** | [https://webapp-psi-inky.vercel.app](https://webapp-psi-inky.vercel.app) |
+| **Docs** | [https://webapp-psi-inky.vercel.app/docs](https://webapp-psi-inky.vercel.app/docs) |
+| **Backend (Cloudflare Workers)** | [https://sabi-backend.ben-imadali.workers.dev](https://sabi-backend.ben-imadali.workers.dev) |
+| **Developer docs (Plop)** | [Sabi Developer Docs](https://plop.so/6o136tyqlu) |
+
 ## Hackathon
 
 - **Builder guide (Google Doc):** [Autonomous Business Hackathon \| Current Builder Guide](https://docs.google.com/document/d/17SGdLqwsSo0t0fML_az95LL40BBxly-pKJQsJhxCDQ8/edit?tab=t.0)

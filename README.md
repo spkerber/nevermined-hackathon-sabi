@@ -2,6 +2,14 @@
 
 A2A verification-as-a-service for the Nevermined hackathon. Requesters submit real-world questions (e.g. "How many Fantas are in the vending machine?"), nearby verifiers with Ray-Ban Meta smart glasses go check, capture photo evidence, and answer vocally. Requesters review the artifact (photos + transcribed answer) in a webapp.
 
+## Live deployment
+
+| Component | URL |
+|-----------|-----|
+| **Webapp (Vercel)** | [https://webapp-psi-inky.vercel.app](https://webapp-psi-inky.vercel.app) |
+| **Docs** | [https://webapp-psi-inky.vercel.app/docs](https://webapp-psi-inky.vercel.app/docs) |
+| **Backend (Cloudflare Workers)** | [https://sabi-backend.ben-imadali.workers.dev](https://sabi-backend.ben-imadali.workers.dev) |
+
 ## Quick start
 
 ### Backend (Cloudflare Workers)
@@ -20,7 +28,7 @@ npm install
 npm run dev
 ```
 
-The webapp connects to the backend at `http://localhost:8787` by default. Set `NEXT_PUBLIC_API_URL` in `webapp/.env.local` to change.
+The webapp connects to the backend at `http://localhost:8787` by default. For production (Vercel), set `NEXT_PUBLIC_API_URL=https://sabi-backend.ben-imadali.workers.dev` in Vercel env vars.
 
 ### Companion app (iOS -- iPhone + Ray-Ban Metas)
 
@@ -86,12 +94,11 @@ We use **Doppler** for API keys and secrets. For local dev you can still use `.e
 
 ### Deployed URL (Cloudflare → Doppler)
 
-To point the seller and hackathon listing at your deployed worker:
+Our backend is deployed at `https://sabi-backend.ben-imadali.workers.dev`. To point the seller and hackathon listing at it:
 
-1. **Cloudflare:** Workers & Pages → your worker → copy the deployment URL (e.g. `https://your-worker.workers.dev`).
-2. **Doppler:** In the project config, set **`APP_URL`** to that base URL. No trailing slash (e.g. `https://your-worker.workers.dev`).
-3. **Re-register:** Run `npm run register-agent` with that `APP_URL` so Nevermined has the correct endpoint.
-4. **Marketplace:** In the hackathon dashboard, set **Endpoint URL** to `APP_URL/query` (e.g. `https://your-worker.workers.dev/query`).
+1. **Doppler:** Set **`APP_URL`** to `https://sabi-backend.ben-imadali.workers.dev` (no trailing slash).
+2. **Re-register:** Run `npm run register-agent` with that `APP_URL` so Nevermined has the correct endpoint.
+3. **Marketplace:** In the hackathon dashboard, set **Endpoint URL** to `https://sabi-backend.ben-imadali.workers.dev/query`.
 
 Details: [docs/doppler-and-env.md](docs/doppler-and-env.md#using-your-cloudflare-deployment-url), [docs/hackathon-registration-checklist.md](docs/hackathon-registration-checklist.md).
 
