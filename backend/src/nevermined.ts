@@ -1,31 +1,63 @@
-import {
-  Payments,
-  buildPaymentRequired,
-  type X402PaymentRequired,
-  type VerifyPermissionsResult,
-  type SettlePermissionsResult,
-  type EnvironmentName,
-} from "@nevermined-io/payments";
 import type { Env } from "./types";
 
-let paymentsInstance: Payments | null = null;
+const NVM_BACKENDS: Record<string, string> = {
+  sandbox: "https://api.sandbox.nevermined.app",
+  live: "https://api.nevermined.app",
+};
 
-export function getPayments(env: Env): Payments {
-  if (!paymentsInstance) {
-    paymentsInstance = Payments.getInstance({
-      nvmApiKey: env.NVM_API_KEY,
-      environment: env.NVM_ENVIRONMENT as EnvironmentName,
-    });
-  }
-  return paymentsInstance;
+export interface X402PaymentRequired {
+  x402Version: number;
+  resource: { url: string; description?: string };
+  accepts: {
+    scheme: string;
+    network: string;
+    planId: string;
+    extra?: { agentId?: string; httpVerb?: string };
+  }[];
+  extensions: Record<string, unknown>;
 }
 
-export function getPaymentRequired(env: Env, endpoint: string, httpVerb: string): X402PaymentRequired {
-  return buildPaymentRequired(env.NVM_PLAN_ID, {
-    endpoint,
-    agentId: env.NVM_AGENT_ID,
-    httpVerb,
-  });
+export interface VerifyResult {
+  isValid: boolean;
+  invalidReason?: string;
+  payer?: string;
+  agentRequestId?: string;
+}
+
+export interface SettleResult {
+  success: boolean;
+  errorReason?: string;
+  transaction: string;
+  network: string;
+  creditsRedeemed?: string;
+  remainingBalance?: string;
+}
+
+function getBackend(env: Env): string {
+  return NVM_BACKENDS[env.NVM_ENVIRONMENT] ?? NVM_BACKENDS.sandbox;
+}
+
+export function buildPaymentRequired(
+  env: Env,
+  endpoint: string,
+  httpVerb: string,
+): X402PaymentRequired {
+  return {
+    x402Version: 2,
+    resource: { url: endpoint },
+    accepts: [
+      {
+        scheme: "nvm:erc4337",
+        network: "eip155:84532",
+        planId: env.NVM_PLAN_ID,
+        extra: {
+          agentId: env.NVM_AGENT_ID,
+          httpVerb,
+        },
+      },
+    ],
+    extensions: {},
+  };
 }
 
 export function encode402Header(paymentRequired: X402PaymentRequired): string {
@@ -51,13 +83,24 @@ export async function verifyPayment(
   accessToken: string,
   paymentRequired: X402PaymentRequired,
   credits: bigint = 1n,
-): Promise<VerifyPermissionsResult> {
-  const payments = getPayments(env);
-  return payments.facilitator.verifyPermissions({
-    paymentRequired,
-    x402AccessToken: accessToken,
-    maxAmount: credits,
+): Promise<VerifyResult> {
+  const backend = getBackend(env);
+  const res = await fetch(`${backend}/api/v1/x402/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      paymentRequired,
+      x402AccessToken: accessToken,
+      maxAmount: credits.toString(),
+    }),
   });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(err.message ?? `Verify failed: HTTP ${res.status}`);
+  }
+
+  return res.json() as Promise<VerifyResult>;
 }
 
 export async function settlePayment(
@@ -65,11 +108,22 @@ export async function settlePayment(
   accessToken: string,
   paymentRequired: X402PaymentRequired,
   credits: bigint = 1n,
-): Promise<SettlePermissionsResult> {
-  const payments = getPayments(env);
-  return payments.facilitator.settlePermissions({
-    paymentRequired,
-    x402AccessToken: accessToken,
-    maxAmount: credits,
+): Promise<SettleResult> {
+  const backend = getBackend(env);
+  const res = await fetch(`${backend}/api/v1/x402/settle`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      paymentRequired,
+      x402AccessToken: accessToken,
+      maxAmount: credits.toString(),
+    }),
   });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(err.message ?? `Settle failed: HTTP ${res.status}`);
+  }
+
+  return res.json() as Promise<SettleResult>;
 }

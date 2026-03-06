@@ -8,7 +8,6 @@
     "db:init": "wrangler d1 execute sabi-db --local --command \"SELECT 1\""
   },
   "dependencies": {
-    "@nevermined-io/payments": "^1.1.6",
     "agents": "^0.7.1"
   },
   "devDependencies": {

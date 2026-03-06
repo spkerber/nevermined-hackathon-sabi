@@ -2,7 +2,7 @@ import { routeAgentRequest, getAgentByName } from "agents";
 import type { Env } from "./types";
 import type { JobRegistry } from "./job-registry";
 import {
-  getPaymentRequired,
+  buildPaymentRequired,
   build402Response,
   verifyPayment,
   settlePayment,
@@ -78,7 +78,7 @@ export default {
     // ── POST /api/verifications ── Create a new verification job (payment required)
     if (url.pathname === "/api/verifications" && request.method === "POST") {
       try {
-        const paymentRequired = getPaymentRequired(env, "/api/verifications", "POST");
+        const paymentRequired = buildPaymentRequired(env, "/api/verifications", "POST");
         const accessToken = request.headers.get("payment-signature");
 
         if (!accessToken) {
