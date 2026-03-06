@@ -10,6 +10,8 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var userTranscript: String = ""
   @Published var aiTranscript: String = ""
   @Published var wasInterrupted: Bool = false
+  /// Full conversation log accumulated across all turns
+  @Published var fullTranscript: String = ""
 
   let verificationSession = VerificationSessionManager()
 
@@ -36,6 +38,7 @@ class GeminiSessionViewModel: ObservableObject {
 
     isGeminiActive = true
     wasInterrupted = false
+    fullTranscript = ""
     verificationSession.startSession()
 
     // Handle audio interruptions (e.g. incoming phone call)
@@ -73,6 +76,10 @@ class GeminiSessionViewModel: ObservableObject {
     geminiService.onTurnComplete = { [weak self] in
       guard let self else { return }
       Task { @MainActor in
+        // Log completed AI turn to full transcript
+        if !self.aiTranscript.isEmpty {
+          self.fullTranscript += "AI: \(self.aiTranscript)\n"
+        }
         self.userTranscript = ""
       }
     }
@@ -80,8 +87,14 @@ class GeminiSessionViewModel: ObservableObject {
     geminiService.onInputTranscription = { [weak self] text in
       guard let self else { return }
       Task { @MainActor in
+        // When user starts speaking, log any pending AI transcript
+        if self.userTranscript.isEmpty && !self.aiTranscript.isEmpty {
+          // AI transcript was already logged on turnComplete
+          self.aiTranscript = ""
+        }
         self.userTranscript += text
-        self.aiTranscript = ""
+        // Log user speech to full transcript
+        self.fullTranscript += "User: \(text)\n"
       }
     }
 

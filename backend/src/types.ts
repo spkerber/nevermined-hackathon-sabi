@@ -20,6 +20,7 @@ export interface VerificationJob {
   status: JobStatus;
   verifier_id: string | null;
   answer: string | null;
+  transcript: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -40,5 +41,6 @@ export interface AgentState {
 export interface Artifact {
   question: string;
   answer: string;
+  transcript: string | null;
   frames: { url: string; timestamp: number }[];
 }

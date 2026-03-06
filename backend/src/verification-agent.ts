@@ -20,6 +20,7 @@ export class VerificationAgent extends Agent<Env, AgentState> {
         status TEXT NOT NULL DEFAULT 'connecting',
         verifier_id TEXT,
         answer TEXT,
+        transcript TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )
@@ -75,6 +76,7 @@ export class VerificationAgent extends Agent<Env, AgentState> {
       status: "connecting",
       verifier_id: null,
       answer: null,
+      transcript: null,
       created_at: now,
       updated_at: now,
     };
@@ -158,15 +160,16 @@ export class VerificationAgent extends Agent<Env, AgentState> {
   }
 
   @callable()
-  async endSession(answer: string) {
+  async endSession(answer: string, transcript?: string) {
     const job = this.state.job;
     if (!job) throw new Error("No job found");
     if (job.status !== "in_progress") throw new Error(`Cannot end session in status: ${job.status}`);
 
     const now = Date.now();
-    this.sql`UPDATE jobs SET status = 'verified', answer = ${answer}, updated_at = ${now} WHERE id = ${job.id}`;
+    const tx = transcript ?? null;
+    this.sql`UPDATE jobs SET status = 'verified', answer = ${answer}, transcript = ${tx}, updated_at = ${now} WHERE id = ${job.id}`;
 
-    const updated: VerificationJob = { ...job, status: "verified", answer, updated_at: now };
+    const updated: VerificationJob = { ...job, status: "verified", answer, transcript: tx, updated_at: now };
     this.setState({ ...this.state, status: "verified", job: updated });
     return updated;
   }
@@ -183,6 +186,7 @@ export class VerificationAgent extends Agent<Env, AgentState> {
     return {
       question: job.question,
       answer: job.answer,
+      transcript: job.transcript,
       frames: frames.map((f) => ({
         url: `/api/frames/${f.r2_key}`,
         timestamp: f.timestamp,

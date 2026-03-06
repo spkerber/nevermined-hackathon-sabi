@@ -20,6 +20,7 @@ interface AgentState {
 interface Artifact {
   question: string;
   answer: string;
+  transcript: string | null;
   frames: { url: string; timestamp: number }[];
 }
 
@@ -192,6 +193,16 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
               <p className="text-sm text-emerald-400 mb-1">Verified Answer</p>
               <p className="text-lg">{artifact.answer}</p>
             </div>
+
+            {/* Transcript */}
+            {artifact.transcript && (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+                <p className="text-sm text-zinc-400 mb-2">Conversation Transcript</p>
+                <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto">
+                  {artifact.transcript}
+                </pre>
+              </div>
+            )}
 
             {/* Photo step-through */}
             {artifact.frames.length > 0 && (

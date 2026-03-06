@@ -229,9 +229,9 @@ struct StreamView: View {
         }
       }
 
-      // End session with answer
+      // End session with answer + transcript
       uploadStatus = "Submitting..."
-      try await apiClient.endSession(jobId: jobId, answer: answer)
+      try await apiClient.endSession(jobId: jobId, answer: answer, transcript: geminiVM.fullTranscript)
 
       showVerificationComplete = true
     } catch {

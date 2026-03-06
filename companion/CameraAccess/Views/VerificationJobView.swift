@@ -1,11 +1,18 @@
 import SwiftUI
 import CoreLocation
 
+enum JobTab: String, CaseIterable {
+  case available = "Available"
+  case myJobs = "My Jobs"
+}
+
 struct VerificationJobView: View {
   let onJobAccepted: (String, String) -> Void  // (jobId, question)
   @StateObject private var apiClient = SabiAPIClient()
   @StateObject private var locationManager = LocationHelper()
   @State private var jobs: [AvailableJob] = []
+  @State private var myJobs: [AvailableJob] = []
+  @State private var selectedTab: JobTab = .available
   @State private var isLoading = false
   @State private var isAccepting = false
   @State private var acceptingJobId: String?
@@ -19,7 +26,7 @@ struct VerificationJobView: View {
       VStack(spacing: 0) {
         // Top bar
         HStack {
-          Text("Available Jobs")
+          Text("Jobs")
             .font(.system(size: 24, weight: .bold))
             .foregroundColor(.white)
 
@@ -35,63 +42,27 @@ struct VerificationJobView: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
+        .padding(.bottom, 12)
+
+        // Tab picker
+        Picker("", selection: $selectedTab) {
+          ForEach(JobTab.allCases, id: \.self) { tab in
+            Text(tab.rawValue).tag(tab)
+          }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 20)
         .padding(.bottom, 16)
 
         ScrollView {
-          if isLoading && jobs.isEmpty {
-            VStack(spacing: 12) {
-              Spacer(minLength: 120)
-              ProgressView()
-                .scaleEffect(1.5)
-                .tint(.white)
-              Text("Loading jobs...")
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.6))
-            }
-            .frame(maxWidth: .infinity)
-          } else if jobs.isEmpty {
-            VStack(spacing: 12) {
-              Spacer(minLength: 120)
-              Image(systemName: "tray")
-                .font(.system(size: 40))
-                .foregroundColor(.white.opacity(0.3))
-              Text("No jobs available")
-                .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.5))
-              Text("Pull down to refresh")
-                .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.3))
-              Button("Seed Demo Jobs") {
-                Task { await seedAndRefresh() }
-              }
-              .font(.system(size: 14, weight: .semibold))
-              .foregroundColor(.black)
-              .padding(.horizontal, 20)
-              .padding(.vertical, 10)
-              .background(Color.white)
-              .cornerRadius(8)
-              .padding(.top, 8)
-            }
-            .frame(maxWidth: .infinity)
+          if selectedTab == .available {
+            availableJobsContent
           } else {
-            LazyVStack(spacing: 12) {
-              ForEach(jobs) { job in
-                JobCard(
-                  job: job,
-                  distance: distanceString(to: job),
-                  isAccepting: acceptingJobId == job.id,
-                  onAccept: {
-                    Task { await acceptJob(job) }
-                  }
-                )
-              }
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            myJobsContent
           }
         }
         .refreshable {
-          await loadJobs()
+          await loadCurrentTab()
         }
 
         // Error banner
@@ -113,8 +84,114 @@ struct VerificationJobView: View {
       locationManager.requestPermission()
       await loadJobs()
     }
+    .onChange(of: selectedTab) { _ in
+      Task {
+        await loadCurrentTab()
+      }
+    }
     .sheet(isPresented: $showSettings) {
       SettingsView()
+    }
+  }
+
+  @ViewBuilder
+  private var availableJobsContent: some View {
+    if isLoading && jobs.isEmpty {
+      VStack(spacing: 12) {
+        Spacer(minLength: 120)
+        ProgressView()
+          .scaleEffect(1.5)
+          .tint(.white)
+        Text("Loading jobs...")
+          .font(.system(size: 14))
+          .foregroundColor(.white.opacity(0.6))
+      }
+      .frame(maxWidth: .infinity)
+    } else if jobs.isEmpty {
+      VStack(spacing: 12) {
+        Spacer(minLength: 120)
+        Image(systemName: "tray")
+          .font(.system(size: 40))
+          .foregroundColor(.white.opacity(0.3))
+        Text("No jobs available")
+          .font(.system(size: 16))
+          .foregroundColor(.white.opacity(0.5))
+        Text("Pull down to refresh")
+          .font(.system(size: 13))
+          .foregroundColor(.white.opacity(0.3))
+        Button("Seed Demo Jobs") {
+          Task { await seedAndRefresh() }
+        }
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundColor(.black)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(Color.white)
+        .cornerRadius(8)
+        .padding(.top, 8)
+      }
+      .frame(maxWidth: .infinity)
+    } else {
+      LazyVStack(spacing: 12) {
+        ForEach(jobs) { job in
+          JobCard(
+            job: job,
+            distance: distanceString(to: job),
+            isAccepting: acceptingJobId == job.id,
+            onAccept: {
+              Task { await acceptJob(job) }
+            }
+          )
+        }
+      }
+      .padding(.horizontal, 20)
+      .padding(.bottom, 20)
+    }
+  }
+
+  @ViewBuilder
+  private var myJobsContent: some View {
+    if isLoading && myJobs.isEmpty {
+      VStack(spacing: 12) {
+        Spacer(minLength: 120)
+        ProgressView()
+          .scaleEffect(1.5)
+          .tint(.white)
+        Text("Loading history...")
+          .font(.system(size: 14))
+          .foregroundColor(.white.opacity(0.6))
+      }
+      .frame(maxWidth: .infinity)
+    } else if myJobs.isEmpty {
+      VStack(spacing: 12) {
+        Spacer(minLength: 120)
+        Image(systemName: "checkmark.seal")
+          .font(.system(size: 40))
+          .foregroundColor(.white.opacity(0.3))
+        Text("No completed jobs yet")
+          .font(.system(size: 16))
+          .foregroundColor(.white.opacity(0.5))
+        Text("Accept and complete jobs to see them here")
+          .font(.system(size: 13))
+          .foregroundColor(.white.opacity(0.3))
+      }
+      .frame(maxWidth: .infinity)
+    } else {
+      LazyVStack(spacing: 12) {
+        ForEach(myJobs) { job in
+          HistoryJobCard(job: job)
+        }
+      }
+      .padding(.horizontal, 20)
+      .padding(.bottom, 20)
+    }
+  }
+
+  private func loadCurrentTab() async {
+    if selectedTab == .available {
+      await loadJobs()
+    } else {
+      await loadMyJobs()
     }
   }
 
@@ -123,6 +200,17 @@ struct VerificationJobView: View {
     errorMessage = nil
     do {
       jobs = try await apiClient.listAvailableJobs()
+    } catch {
+      errorMessage = error.localizedDescription
+    }
+    isLoading = false
+  }
+
+  private func loadMyJobs() async {
+    isLoading = true
+    errorMessage = nil
+    do {
+      myJobs = try await apiClient.listMyVerifications(verifierId: "iphone-verifier")
     } catch {
       errorMessage = error.localizedDescription
     }
@@ -264,6 +352,71 @@ private struct JobCard: View {
         }
         .disabled(isAccepting)
       }
+    }
+    .padding(16)
+    .background(Color.white.opacity(0.08))
+    .cornerRadius(14)
+  }
+}
+
+// MARK: - History Job Card
+
+private struct HistoryJobCard: View {
+  let job: AvailableJob
+
+  private var statusColor: Color {
+    switch job.status {
+    case "verified": return .green
+    case "in_progress": return .blue
+    case "accepted": return .indigo
+    case "connecting": return .yellow
+    case "cancelled": return .gray
+    default: return .white.opacity(0.5)
+    }
+  }
+
+  private var statusLabel: String {
+    switch job.status {
+    case "verified": return "Verified"
+    case "in_progress": return "In Progress"
+    case "accepted": return "Accepted"
+    case "connecting": return "Connecting"
+    case "cancelled": return "Cancelled"
+    default: return job.status
+    }
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        HStack(spacing: 6) {
+          Circle()
+            .fill(statusColor)
+            .frame(width: 8, height: 8)
+          Text(statusLabel)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(statusColor)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(statusColor.opacity(0.15))
+        .cornerRadius(6)
+
+        Spacer()
+
+        Text(String(format: "$%.0f", job.payout))
+          .font(.system(size: 14, weight: .bold))
+          .foregroundColor(.green)
+      }
+
+      Text(job.question)
+        .font(.system(size: 15, weight: .medium))
+        .foregroundColor(.white)
+        .lineLimit(2)
+
+      Text(job.category)
+        .font(.system(size: 12))
+        .foregroundColor(.white.opacity(0.5))
     }
     .padding(16)
     .background(Color.white.opacity(0.08))

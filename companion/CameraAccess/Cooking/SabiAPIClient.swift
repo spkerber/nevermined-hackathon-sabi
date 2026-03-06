@@ -81,6 +81,21 @@ class SabiAPIClient: ObservableObject {
     }
   }
 
+  // List jobs for a verifier (their history)
+  func listMyVerifications(verifierId: String) async throws -> [AvailableJob] {
+    var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications?verifierId=\(verifierId)")!)
+    request.httpMethod = "GET"
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+      let body = String(data: data, encoding: .utf8) ?? ""
+      throw SabiAPIError.apiError("List my jobs failed: \(body.prefix(200))")
+    }
+
+    let result = try JSONDecoder().decode(AvailableJobsResponse.self, from: data)
+    return result.jobs
+  }
+
   // Cancel a verification job (returns it to available)
   func cancelJob(jobId: String) async throws {
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)/cancel")!)
@@ -159,11 +174,15 @@ class SabiAPIClient: ObservableObject {
   }
 
   // End a verification session
-  func endSession(jobId: String, answer: String) async throws {
+  func endSession(jobId: String, answer: String, transcript: String? = nil) async throws {
     isLoading = true
     statusMessage = "Submitting answer..."
 
-    let body = try JSONSerialization.data(withJSONObject: ["answer": answer])
+    var payload: [String: Any] = ["answer": answer]
+    if let transcript, !transcript.isEmpty {
+      payload["transcript"] = transcript
+    }
+    let body = try JSONSerialization.data(withJSONObject: payload)
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)/end")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
