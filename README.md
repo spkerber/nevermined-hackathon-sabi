@@ -105,8 +105,11 @@ Details: [docs/doppler-and-env.md](docs/doppler-and-env.md#using-your-cloudflare
 ## Docs
 
 - [docs/PRD.md](docs/PRD.md) -- Full product requirements
+- [docs/design-tokens.md](docs/design-tokens.md) -- Brand and color tokens (A11y, Berkeley Mono–inspired)
 - [docs/references.md](docs/references.md) -- Hackathon and Nevermined links
 - [docs/team.md](docs/team.md) -- Team info
+- [docs/demo-video-script.md](docs/demo-video-script.md) -- Demo video script, scene list, use cases
+- [demo-video/README.md](demo-video/README.md) -- Remotion project for hackathon demo video
 
 ## Buyers / Sellers agents (feature branch)
 
