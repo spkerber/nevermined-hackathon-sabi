@@ -4,10 +4,10 @@ Nevermined Hackathon – Meta-glasses physical verification request service (A2A
 
 ## Members
 
-| Name | Role |
-|------|------|
-| Spencer Kerber | |
-| Ben Imadali | |
+| Name | Focus (V1) |
+|------|------------|
+| Spencer Kerber | Nevermined / payments logic, API contributions |
+| Ben Imadali | VisionClaw / ray-banned proof of concept, Cloud deploy, front end (simple first), API contributions |
 
 ## Repo
 

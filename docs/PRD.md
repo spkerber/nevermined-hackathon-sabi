@@ -12,7 +12,7 @@ Enable anyone to request verifiable, real-world information -- answered and evid
 
 ### Thesis
 
-The most valuable agents operate at the interface between the abstract digital world and the chaotic physical world. In an era of fake and generated content, verifiable truth about physical reality is increasingly scarce and valuable. Sabi bridges that gap -- turning real humans with wearable hardware into a paid verification layer that AI agents and remote parties can tap into for ground-truth information with photographic evidence.
+The most valuable agents operate at the interface between the abstract digital world and the chaotic physical world. In an era of fake and generated content, verifiable truth about physical reality is increasingly scarce and valuable. Sabi bridges that gap -- turning real humans with wearable hardware into a paid verification layer that AI agents and remote parties can tap into for ground-truth information with photographic evidence. In that sense, Sabi is a form of **OSINT-style verification**: a way to pay for on-demand, real-world intelligence (who, what, where, when) with photo evidence, rather than scraping or aggregating existing open-source data. See [§12 Positioning: OSINT-style verification](#positioning-osint-style-verification).
 
 ### Background
 
@@ -100,6 +100,8 @@ Sabi uses **multiple agents** for selling, buying, onboarding, order-help, and t
 - Scale or productization beyond demo.
 - Open verifier signup or public worker pool (V1: Ben + Spencer only).
 - Automated refund flows (V1: Sabi absorbs cost of failed orders and labor).
+- Dynamic pricing by difficulty, distance, or estimated duration (post-V1).
+- Change orders / line items (post-V1; "things change" in service world — we may add later; no full price marketplace yet).
 
 ---
 
@@ -112,19 +114,20 @@ Sabi uses **multiple agents** for selling, buying, onboarding, order-help, and t
 - **Backend:** Verification service that (1) accepts paid verification requests, (2) matches to nearby verifiers by geolocation, (3) manages session lifecycle, (4) captures photos from Ray-Ban Meta stream (1 photo / 5 seconds), (5) transcribes vocal answer, (6) assembles and delivers artifact.
 - **Ray-Ban Meta integration via companion app:** A fork of the **ray-banned** app (`~/Projects/ray-banned`) runs on the verifier's iPhone, paired with Ray-Ban Metas via Meta DAT SDK. When the verifier starts a verification session, the app programmatically captures 1 photo every 5 seconds (pattern adapted from ray-banned's `captureFrameIfNeeded()` in `CookingSessionManager`). Capture stops when the session ends. Transcription uses **Gemini 2.5 Flash** native audio via WebSocket (same as ray-banned: iPhone mic → 16kHz PCM → Gemini → transcribed answer).
 - **Artifact:** A bundle containing (1) the original question, (2) the transcribed vocal answer, (3) timestamped photos captured during the session. Reviewable in a webapp as a step-through slideshow with the answer displayed.
-- **Job status lifecycle:** Each verification job has a status visible to the requester: `connecting` (seeking a verifier) -> `rejected` (a verifier explicitly declined; job may be re-offered to next verifier) -> `accepted` (verifier took the job) -> `in_progress` (verification session active) -> `verified` (session complete, artifact ready) or `cancelled` / `abandoned` (verifier ended the job after acceptance but before completion). Requester sees real-time status updates.
+- **Job = verifiable question:** A job is a single verifiable question (e.g. "Are the vending machines working in the AWS Loft?"). Requester submits it and sees status in their **dashboard**: `connecting` (seeking a verifier) -> `accepted` (verifier took it) -> `in_progress` (session active) -> `verified` (artifact ready, job closed). When verified: requester is charged, can see photos + answer, job is closed out.
+- **Job status lifecycle:** Each verification job has a status visible to the requester: `connecting` (seeking a verifier) -> `rejected` (a verifier explicitly declined; job may be re-offered to next verifier) -> `accepted` (verifier took the job) -> `in_progress` (verification session active) -> `verified` (session complete, artifact ready) or `cancelled` / `abandoned` (verifier ended the job after acceptance but before completion). Requester sees real-time status updates in the dashboard.
 - **Refunds:** When a job is `rejected` (verifier declined before starting) or `cancelled`/`abandoned` (verifier ended after accept, before completion), the requester is refunded. V1: Sabi absorbs the cost of failed orders and labor (no charge to requester; verifier not paid for abandoned jobs). Post-V1: implement Nevermined reversal/refund flows as needed.
-- **Verifier choice:** Verifier can decline a job (with optional reason: e.g. too far, too difficult, can't access, unsafe, or illicit) and can end a job after acceptance but before completion (abandon), with reason; backend sets status and applies refund policy.
+- **Verifier choice:** Verifier can decline a job (with optional reason: e.g. too far, too difficult, can't access, unsafe, or illicit) and can end a job after acceptance but before completion (abandon), with reason; backend sets status and applies refund policy. When a verifier abandons (or declines after accepting), the job returns to `connecting` and is re-offered to the market; verifier can leave a note (e.g. "can't access location") for the system or next verifier.
 
 ### Key features (V1)
 
 - Verification request submission: question text + target geolocation.
 - Geolocation-based verifier matching from a pool of available verifiers.
-- Job offer to verifier: shows pay amount, distance to target, question summary. Verifier can accept or decline.
+- Job offer to verifier (mobile app notification): shows **pay amount**, **distance** to target, and **category** of job (e.g. "venue / vending") — not the full question detail, to avoid giving away too much before accept. Verifier can accept or decline. On accept, full question and instructions are shown.
 - Detailed instructions delivered to verifier on acceptance.
 - Voice-initiated verification session on Ray-Ban Metas.
 - Programmatic photo capture: companion app (ray-banned fork on iPhone, Meta DAT SDK) captures 1 photo every 5 seconds from Ray-Ban Meta stream via `streamSession.capturePhoto()`; pattern from ray-banned's `captureFrameIfNeeded()`. Starts when session begins, stops when session ends. Photos uploaded to Cloudflare R2.
-- Vocal answer capture: verifier speaks the answer; iPhone mic (AVAudioEngine) → 16kHz PCM → Gemini 2.5 Flash WebSocket → transcribed answer (same as ray-banned).
+- Vocal answer capture: verifier speaks the answer; iPhone mic (AVAudioEngine) → 16kHz PCM → Gemini 2.5 Flash WebSocket → transcribed answer (same as ray-banned). Whether verifier also explicitly confirms (e.g. "Yes, I agree") or how to handle ambiguous photos is TBD — design for flexibility in future; V1 focus is getting the pipeline running.
 - Job status lifecycle: `connecting` -> `rejected` (optional) -> `accepted` -> `in_progress` -> `verified` or `cancelled`/`abandoned`, visible to requester in real-time.
 - Verifier can decline a job with optional reason (e.g. too far, too difficult, can't access, unsafe, illicit); can abandon after accept with reason. Refund to requester; V1 Sabi absorbs cost.
 - Artifact assembly: question + transcribed answer + timestamped photos.
@@ -135,7 +138,7 @@ Sabi uses **multiple agents** for selling, buying, onboarding, order-help, and t
 
 - **System-level (optional for V1):** Simple rules can filter jobs before offer: e.g. max distance from verifier, max payout, blocklist of keywords or categories. Jobs that fail eligibility are not offered (or get a "not eligible" state).
 - **Verifier-level:** Verifier can decline or abandon with reason; reasons (e.g. "too far", "illegal") can inform eligibility rules or flagging post-V1.
-- **Content policy:** We do not fulfill requests that are illegal, harmful, or that ask the verifier to do anything dangerous or illicit. Verifiers are encouraged to decline such jobs; Sabi may add keyword/pattern checks and manual review post-V1. Examples of in-scope: "Is my garage door closed?" (with consent); out-of-scope: "Go into a restricted area" (verifier may decline; we may add eligibility so such jobs are not offered).
+- **Content policy:** We do not fulfill requests that are illegal, harmful, or that ask the verifier to do anything dangerous or illicit (e.g. life-threatening). Verifiers are encouraged to decline such jobs; Sabi may add keyword/pattern checks and manual review post-V1. Examples of in-scope: "Is my garage door closed?" (with consent); out-of-scope: "Go into a restricted area" or high-risk tasks. Onboarding and order-help agents (purchaser-facing) should guide to **doable** jobs we want to offer and apply simple guardrails so nothing illegal or out-of-scope is requested "while we're sleeping."
 
 ### Verifier identity (truth providers)
 
@@ -152,7 +155,7 @@ We set up **multiple agents** to cover selling, buying, onboarding, order-help, 
 | **Seller agent** | Sabi verification-as-a-service | Lists verification as a metered service on the market; validates payment (x402); matches requests to nearby verifiers; delivers artifacts; handles reject/abandon and refund policy. Registers in Nevermined as the seller. |
 | **Buyer agent** | Purchasing verification (data) | Acts on behalf of the requester to buy verification. Submits verification requests with `payment-signature`; can be the webapp, a skill inside a coding agent (Claude/Codex), or a dedicated "buying" agent that helps requesters purchase verification. |
 | **Onboarding agent(s)** | User onboarding | Helps people register as requester or verifier, set location, connect wallet, and understand the flow. Can be conversational (chat) or guided UI. |
-| **Order-help agent** | Helping requesters make an order | Suggests question types and examples (e.g. "Is there food at the lunch counter?", "Is the vending machine working?", "Open chairs in AWS Builders Loft?"); helps formulate the verification question and target location; guides through payment and submission. |
+| **Order-help agent** | Helping requesters make an order | For the **purchaser**: "Here are things you could be purchasing right now; what do you think would be interesting?" Suggests question types and examples (e.g. "Are the vending machines working in the AWS Loft?", "Is there food at the lunch counter?", "Open chairs in AWS Builders Loft?"); helps formulate the verification question and target location; guides through payment and submission. From the **seller** side, this agent guides requesters to doable jobs we want to offer and applies simple guardrails (nothing illegal or out-of-scope). |
 | **Turker (verifier) agent** | Assisting the human verifier | Surfaces nearby jobs (pay, distance, question summary); helps accept, decline, or abandon with reason; guides the verification session (e.g. go to location, answer vocally, end session). Runs in the verifier companion app or as a voice/skill for the turker. |
 
 - **Seller** and **buyer** agents are required for the A2A payment flow (Nevermined). **Onboarding**, **order-help**, and **turker** agents improve UX and can be phased (e.g. order-help and turker agent in V1; onboarding can start as guided UI).
@@ -185,7 +188,7 @@ Both modes use the same backend and the same authentication. Both require Neverm
 
 - Requester can submit a verification question with a target geolocation.
 - `POST /verifications` requires a Nevermined `payment-signature` (x402). No payment = no verification (402 Payment Required).
-- Requester sees real-time job status: `connecting`, `rejected` (verifier declined; may be re-offered), `accepted`, `in_progress`, `verified` (artifact ready), or `cancelled`/`abandoned` (verifier ended before completion; requester refunded, V1 Sabi absorbs cost).
+- Requester has a **dashboard** and sees real-time job status: `connecting`, `rejected` (verifier declined; may be re-offered), `accepted`, `in_progress`, `verified` (artifact ready), or `cancelled`/`abandoned` (verifier ended before completion; requester refunded, V1 Sabi absorbs cost). When status is `verified`, requester is charged and can see photos + answer; job is closed out.
 - Requester is notified on status transitions (especially `accepted`, `verified`, `rejected`, `cancelled`/`abandoned`).
 - On completion, requester receives a receipt (email or in-app) that includes the verifier's name and LinkedIn profile link, with an optional CTA to connect (truth-provider identity).
 - Requester can review the artifact in a webapp: step-through photo viewer + transcribed answer.
@@ -193,9 +196,9 @@ Both modes use the same backend and the same authentication. Both require Neverm
 #### Verifier
 
 - Verifier registers in the pool with their current geolocation.
-- Verifier receives job offers for nearby verification requests (question summary, pay, distance).
+- Verifier receives job offers (mobile notification) for nearby requests: pay, distance, and category of job (e.g. "venue / vending") — not full question detail until accepted.
 - Verifier can accept or decline a job offer. Decline can include an optional reason (e.g. too far, too difficult, can't access, unsafe, illicit).
-- Verifier can end the job after acceptance but before completion (abandon), with optional reason; job status becomes `cancelled`/`abandoned`, requester is refunded, V1 Sabi absorbs cost.
+- Verifier can end the job after acceptance but before completion (abandon), with optional note; job returns to `connecting` and is re-offered to the market; job status becomes `cancelled`/`abandoned`, requester is refunded, V1 Sabi absorbs cost.
 - On acceptance, verifier receives detailed instructions (full question, target location details).
 - Verifier can start a verification session vocally via Ray-Ban Metas.
 - During an active session, 1 photo is captured every 5 seconds from the Ray-Ban Meta stream and uploaded.
@@ -380,7 +383,20 @@ Worker (fetch handler):
 
 ---
 
-## 11. Appendix
+## 11. Next steps (implementation priorities)
+
+From team alignment (Spencer + Ben): prioritize **pipeline and infra first**, then product experience.
+
+1. **Pipeline first**
+   - **App data + APIs:** App has app data; iPhone app and web app both interact with it; Ray-Bans (via companion app) provide the data needed for the APIs. Get this data pipeline and API surface in place first.
+   - **Photo storage, APIs, deploy:** Photo storage (R2), APIs for jobs/sessions/artifacts, **auto-deploy on git push**, and a **local deployment experience** so we can iterate locally. Once this is up, the product experience (UX) can be "killed and rebuilt or tweaked" as needed.
+2. **VisionClaw / ray-banned (Ben):** First shot at the companion app and proof of concept; expect bugs. Ben owns getting the VisionClaw/ray-banned integration up and running (photo capture, session lifecycle, connection to backend).
+3. **Then:** Shared API code that both can contribute to. **Spencer:** payments logic, Nevermined integration. **Ben:** connection to Cloud deployment, deployment of front end (something simple to start). Both: contribute to API and backend.
+4. **Order-help / onboarding agent:** Build an agent for the **purchaser** that does onboarding and suggests "here are things you could be purchasing right now; what would be interesting?" so the experience isn’t "what the fuck is this?" — and from the seller side, guide to doable jobs with simple guardrails (nothing illegal). Can follow once pipeline is stable.
+
+---
+
+## 12. Appendix
 
 ### References
 
@@ -392,8 +408,13 @@ Worker (fetch handler):
 - ray-banned (`~/Projects/ray-banned`) -- Working VisionClaw fork used as reference implementation and fork base. Demonstrates DAT SDK integration, 5s timelapse capture, Gemini transcription, Cloudflare Workers + Supabase + R2 backend.
 - [Ray-Ban Meta developer docs](https://www.meta.com/smart-glasses/) -- hardware reference.
 - [Amazon Mechanical Turk](https://www.mturk.com/) -- crowdsourcing model reference (Sabi uses the same paradigm; we do not use the MTurk API).
+- [OSINT Industries](https://www.osint.industries/) -- OSINT platform (digital lookup, real-time data, linked accounts); Sabi is complementary as paid physical-world verification / OSINT-style materials with photo evidence.
 - **LangChain / LangGraph** -- option for deep-agent orchestration (multi-step, tool-calling agents). [LangChain](https://www.langchain.com/), [LangGraph](https://langchain-ai.github.io/langgraph/).
 - **Mindra** -- option for agent orchestration; can run onboarding, order-help, turker, buyer agents against Sabi API. (Hackathon / team docs for Mindra integration TBD.)
+
+### Positioning: OSINT-style verification
+
+Sabi can be framed as an **OSINT verification service** or a **way to pay for OSINT-style materials**: requesters buy verifiable, real-world intelligence (ground truth about a place, object, or condition) with photo evidence and a human-attested answer, rather than relying on pre-existing open-source data. Tools like [OSINT Industries](https://www.osint.industries/) focus on digital footprint lookup (email, phone, username, linked accounts, breach data) and real-time retrieval from 1500+ sources; Sabi complements that by supplying **physical-world verification** on demand — a human with glasses goes to the place, captures evidence, and answers the question. Same “intelligence with confidence” goal; Sabi adds a paid, human-in-the-loop layer for physical verification that isn’t available from static or scraped OSINT alone.
 
 ### Use case spectrum
 
@@ -423,3 +444,4 @@ Worker (fetch handler):
 - **Refund:** Requester credited back when job is rejected or abandoned; V1 handled by Sabi absorbing cost (no Nevermined reversal required for demo).
 - **Durable Object:** Cloudflare's stateful compute primitive. Each verification job runs as a Durable Object instance with built-in SQLite and WebSocket support.
 - **R2:** Cloudflare's S3-compatible object storage, used for verification session photos.
+- **OSINT:** Open-Source Intelligence; Sabi delivers OSINT-style outputs (verifiable real-world intel with photo evidence) as a paid, on-demand service rather than from static or scraped sources.
