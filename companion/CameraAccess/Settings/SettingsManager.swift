@@ -32,9 +32,10 @@ final class SettingsManager {
   var workerURL: String {
     get {
       let saved = defaults.string(forKey: Key.workerURL.rawValue)
-      // If the saved URL points to localhost or a LAN IP, fall back to the compiled default
-      // (these are unreachable from a real device on a different network)
-      if let saved, saved.contains("localhost") || saved.contains("172.24.") || saved.contains("192.168.") {
+      // If the saved URL points to localhost, a LAN IP, or an ngrok tunnel, fall back to the compiled default
+      // (these are unreachable from a real device or expire)
+      if let saved,
+         saved.contains("localhost") || saved.contains("172.") || saved.contains("192.168.") || saved.contains("ngrok") {
         return Secrets.workerURL
       }
       return saved ?? Secrets.workerURL
