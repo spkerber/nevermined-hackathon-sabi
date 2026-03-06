@@ -94,9 +94,11 @@ We use **Doppler** for API keys and secrets. For local dev you can still use `.e
 
 On branch `feature/buyers-sellers-agents`: minimal **seller** (Express API with x402) and **buyer** (order plan + call seller) for sandbox → prod payment flow. No VisionClaw integration.
 
-- **Register agent (once):** `npm run register-agent` — requires `NVM_API_KEY`, `BUILDER_ADDRESS`; writes `NVM_AGENT_ID`, `NVM_PLAN_ID` to add to env/Doppler.
-- **Run seller:** `npm run seller` — serves `POST /query` with payment validation (402 without `payment-signature`).
-- **Run buyer:** `npm run buyer:order-and-call "Your question"` — set `NVM_PLAN_ID`, `NVM_AGENT_ID`, `SELLER_URL`; uses subscriber `NVM_API_KEY` to order plan, get x402 token, call seller.
+- **Register agent (once):** `npm run register-agent` — requires `NVM_API_KEY`, `BUILDER_ADDRESS`; writes `NVM_AGENT_ID`, `NVM_PLAN_ID` to add to Doppler.
+- **Run seller:** `doppler run -- npm run seller` — serves `POST /query` with payment validation (402 without `payment-signature`).
+- **Run buyer:** `doppler run -- npm run buyer:order-and-call "Your question"` — same key and config; orders plan, gets x402 token, calls seller.
+
+**Quick test (same key):** Terminal 1: `doppler run -- npm run seller`. Terminal 2: `curl -X POST http://localhost:3000/query -H "Content-Type: application/json" -d '{"prompt":"Hi"}'` (expect 402), then `doppler run -- npm run buyer:order-and-call "Hi"` (expect 200 + result). See [docs/doppler-and-env.md](docs/doppler-and-env.md) for full steps. To **buy from another team’s agent** and stash the response: [docs/buy-from-another-agent.md](docs/buy-from-another-agent.md).
 
 Refs: [5-Minute Setup](https://nevermined.ai/docs/integrate/quickstart/5-minute-setup), [Nevermined App](https://nevermined.app/permissions/global-permissions), [Doppler](https://dashboard.doppler.com/workplace/37ee0f06177aa6997f55/projects/nevermined-hackathon-sabi).
 

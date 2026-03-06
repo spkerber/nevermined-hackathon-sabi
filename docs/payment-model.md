@@ -2,9 +2,12 @@
 
 Nevermined’s same x402 check can be used in three ways: **HTTP API route**, **MCP tool handler**, or **before serving a protected asset**. For Sabi we treat the **protected asset** as the right fit.
 
-## What we’re selling
+## What we’re selling (asset source: Ben’s Meta app)
 
-The **protected asset** is the **verification artifact**: the photos + transcribed answer that the Meta glasses wearer (verifier) produces. That’s what the buyer pays for — access to that deliverable.
+The **protected asset** is the **verification artifact**: the photos + transcribed answer that the **Meta glasses wearer (verifier)** produces via **Ben’s VisionClaw / ray-banned–style app**. That app is the asset source; this repo’s seller agent gates and sells access to those deliverables.
+
+- **Asset source:** Ben’s app (VisionClaw, Meta DAT SDK, companion app) captures and stores the verification outputs. The seller agent (this branch) will protect and monetize access to those assets — either by serving them behind the same x402 check or by putting them behind [Nevermined’s HTTP Proxy](https://nevermined.ai/docs/solutions/access-control-monetization-static-resources) for static-resource protection.
+- **Branch scope:** This branch (`feature/buyers-sellers-agents`) implements the seller/buyer payment layer; integration with Ben’s app (e.g. where artifacts are stored, how the seller serves or proxies them) is the next step. The assets for sale are whatever Ben’s app provides (artifacts at URLs, or API responses).
 
 - **Not** “pay per generic API call” — the value is the verification result.
 - **Yes** “pay to get this artifact” — the same `requirePayment` / verify → settle flow runs **before serving the artifact** (e.g. before returning photos + answer in a GET response or download).
@@ -24,4 +27,4 @@ PRD says “requester pays upfront” and “when verified: requester is charged
 - **Current:** `POST /query` uses `requirePayment` + `settlePayment` as a stub (pay to create a verification request). That’s the HTTP-API-route style.
 - **Next:** When we add artifact delivery (e.g. step-through viewer, or an API that returns artifact JSON + media URLs), run the **same** payment middleware (or an entitlement check: “this job was paid for by this subscriber”) **before** returning the artifact. Reuse `src/seller/middleware/payments.ts` — same `buildPaymentRequired` / `verifyPermissions` / `settlePermissions` pattern before serving the protected asset.
 
-So: **protected asset = verification artifact (photos + answer).** Use the same check before serving it; that’s how we charge/sell the Meta glasses output.
+So: **protected asset = verification artifact (photos + answer)** produced by Ben’s app. Use the same check (or Nevermined’s [static resources proxy](https://nevermined.ai/docs/solutions/access-control-monetization-static-resources)) before serving it; that’s how we charge/sell the Meta glasses output.

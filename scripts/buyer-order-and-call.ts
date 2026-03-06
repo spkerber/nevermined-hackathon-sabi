@@ -1,19 +1,42 @@
 /**
  * Buyer agent: order a plan (if needed), get x402 access token, call seller /query.
- * Use NVM_API_KEY for the buyer (subscriber); seller runs with its own key.
+ * Use NVM_API_KEY for the buyer (subscriber). To buy from another team's agent, set
+ * NVM_PLAN_ID, NVM_AGENT_ID, SELLER_URL to their plan/agent/endpoint.
  *
  * Usage:
- *   PLAN_ID=did:nv:... AGENT_ID=did:nv:... SELLER_URL=http://localhost:3000 npx tsx scripts/buyer-order-and-call.ts
+ *   PLAN_ID=... AGENT_ID=... SELLER_URL=http://localhost:3000 npx tsx scripts/buyer-order-and-call.ts [question]
+ *   BUYER_SAVE_RESPONSE_TO=tmp/purchased/response.json  # optional: stash response to file
  * Or use Doppler: doppler run -- npx tsx scripts/buyer-order-and-call.ts
  *
  * Ref: https://nevermined.ai/docs/integrate/quickstart/5-minute-setup
  */
 
 import { Payments } from '@nevermined-io/payments'
+import { writeFile, mkdir } from 'fs/promises'
+import { dirname, resolve, sep } from 'path'
 
 const PLAN_ID = process.env.NVM_PLAN_ID!
 const AGENT_ID = process.env.NVM_AGENT_ID!
 const SELLER_URL = (process.env.SELLER_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+const SAVE_RESPONSE_TO =
+  process.env.BUYER_SAVE_RESPONSE_TO === '1' || process.env.BUYER_SAVE_RESPONSE_TO === 'yes' || process.env.BUYER_SAVE_RESPONSE_TO === 'true'
+    ? `tmp/purchased/response-${Date.now()}.json`
+    : process.env.BUYER_SAVE_RESPONSE_TO
+
+/** Allowed base directory for stashing responses; avoids path traversal. */
+const PURCHASED_DIR = resolve(process.cwd(), 'tmp', 'purchased')
+
+function resolveSavePath(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const resolved = resolve(process.cwd(), trimmed)
+  const allowedBase = resolve(PURCHASED_DIR)
+  if (resolved !== allowedBase && !resolved.startsWith(allowedBase + sep)) {
+    console.error('BUYER_SAVE_RESPONSE_TO must be inside tmp/purchased/ (path traversal not allowed). Got:', trimmed)
+    return null
+  }
+  return resolved
+}
 
 async function main() {
   if (!process.env.NVM_API_KEY) {
@@ -21,7 +44,7 @@ async function main() {
     process.exit(1)
   }
   if (!PLAN_ID || !AGENT_ID) {
-    console.error('Set NVM_PLAN_ID and NVM_AGENT_ID (from seller registration)')
+    console.error('Set NVM_PLAN_ID and NVM_AGENT_ID (from seller registration or other team)')
     process.exit(1)
   }
 
@@ -53,6 +76,15 @@ async function main() {
     process.exit(1)
   }
   console.log('Seller response:', data)
+
+  if (SAVE_RESPONSE_TO) {
+    const outPath = resolveSavePath(SAVE_RESPONSE_TO)
+    if (outPath) {
+      await mkdir(dirname(outPath), { recursive: true })
+      await writeFile(outPath, JSON.stringify({ ok: res.ok, status: res.status, body: data }, null, 2))
+      console.log('Saved response to', outPath)
+    }
+  }
 }
 
 main().catch((err) => {

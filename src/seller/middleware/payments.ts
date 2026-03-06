@@ -62,8 +62,9 @@ export function requirePayment(req: Request, res: Response, next: NextFunction):
       }
       next()
     })
-    .catch((err) => {
-      console.error('Payment verify error:', err)
+    .catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'unknown'
+      console.log(JSON.stringify({ requestId: (req as Request & { id?: string }).id, error: 'Payment verify failed', message }))
       res.status(502).json({ error: 'Payment verification failed' })
     })
 }

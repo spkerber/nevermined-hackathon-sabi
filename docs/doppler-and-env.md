@@ -27,21 +27,67 @@ Secrets and config are managed via **Doppler** in CI/deploy; for local dev you c
 
 ## Buyer (subscriber) usage
 
-The **buyer** uses a **different** API key (subscriber key from Nevermined App). For local testing you can:
+**Recommended for solo testing:** Use the **same** `NVM_API_KEY` for both registering the agent (seller) and testing as buyer. One Doppler config with that key plus `NVM_AGENT_ID` and `NVM_PLAN_ID` is enough: run `register-agent`, run the seller, then run the buyer script with the same key — you’re the subscriber to your own plan.
 
-- Use the same `NVM_API_KEY` as seller if you are both registering the agent and testing as buyer.
-- Or create a second key in Nevermined App and set it only when running the buyer script (e.g. `NVM_API_KEY=subscriber_key npx tsx scripts/buyer-order-and-call.ts`).
+- **Same key (seller + buyer):** One key in Doppler; use it for `npm run register-agent`, `npm run seller`, and `npm run buyer:order-and-call`. No second key or config needed.
+- **Separate buyer key:** Only if you need a different account as subscriber (e.g. another team). Then use a second Doppler config (e.g. `buyer-dev`) with the buyer’s `NVM_API_KEY` and the same `NVM_PLAN_ID` / `NVM_AGENT_ID`.
 
-Doppler can hold multiple configs (e.g. `dev` with seller key, `buyer-dev` with subscriber key) if you use different projects or config names.
+### Sandbox budget (e.g. 5 USDC)
+
+Our plan is **5 USDC for 100 credits** (1 credit per request). With only 5 USDC in the sandbox:
+
+- **Order the plan once** (in the App or via the buyer script). That spends your 5 USDC and gives you 100 credits.
+- Use those credits for up to 100 calls to `POST /query`; each successful request burns 1 credit. No extra USDC needed until credits run out.
+- Don’t order the plan again unless you want to buy another 100 credits (and have more USDC). One order = one 5 USDC charge.
 
 ### Buyer key and permissions (troubleshooting)
 
 If the buyer script fails with **"Unable to order plan"** or **`BCK.PROTOCOL.0005`**, permissions or plan setup in Nevermined are the usual cause.
 
-1. **Buyer key** — The key used for `NVM_API_KEY` when running the buyer must be a **subscriber** key (the account that will pay for the plan). Create it in [Nevermined App](https://nevermined.app) → API Keys; it can be the same account as the seller or a different one.
+1. **Buyer key** — Use the **same** key as the seller when you’re both registering and testing (one account, one config). The key must be able to subscribe to the plan; create it in [Nevermined App](https://nevermined.app) → API Keys. Use a different key only if you need another account as the subscriber.
 2. **Order the plan in the App first** — In [Nevermined App → Permissions](https://nevermined.app/permissions/global-permissions), find your plan and **order it** (subscribe) with the buyer account. Use test USDC on Base Sepolia for sandbox. After the plan is ordered in the App, the same key can get an x402 token and call the seller; sometimes programmatic `orderPlan()` only works after the plan is orderable (e.g. published) or after a first order via the App.
 3. **Same environment** — Buyer key, `NVM_PLAN_ID`, and `NVM_AGENT_ID` must all be for the same environment (`sandbox` or `live`). Plan IDs from sandbox registration are not valid in live and vice versa.
-4. **Doppler** — When using `doppler run -- npm run buyer:order-and-call`, the active Doppler config must include the **buyer** `NVM_API_KEY` (and the same `NVM_PLAN_ID` / `NVM_AGENT_ID` as the seller). Use a separate config (e.g. `buyer-dev`) if seller and buyer keys differ.
+4. **Doppler** — Use the **same** config for seller and buyer when using one key: it should have `NVM_API_KEY`, `NVM_PLAN_ID`, and `NVM_AGENT_ID`. Only use a separate config (e.g. `buyer-dev`) when you have a different subscriber key.
+
+## How to test both buying and selling (same key, Doppler)
+
+Prereq: You’ve run `npm run register-agent` once and added `NVM_AGENT_ID`, `NVM_PLAN_ID`, and `NVM_API_KEY` (and `BUILDER_ADDRESS`) to Doppler. Plan is 5 USDC for 100 credits; order once in the App or via the buyer script.
+
+**Terminal 1 — seller (selling):**
+
+```bash
+cd /path/to/nevermined-hackathon-sabi
+doppler run -- npm run seller
+```
+
+Leave this running. You should see: `Sabi seller agent listening on http://localhost:3000`.
+
+**Terminal 2 — test selling (no payment → 402):**
+
+```bash
+curl -X POST http://localhost:3000/query -H "Content-Type: application/json" -d '{"prompt": "Hello"}'
+```
+
+Expect **402** and a JSON body with `"error": "Payment Required"` and a `plans` array. That’s the seller correctly rejecting unpaid requests.
+
+**Terminal 2 — test buying (order plan + call seller):**
+
+```bash
+cd /path/to/nevermined-hackathon-sabi
+doppler run -- npm run buyer:order-and-call "Are the vending machines working?"
+```
+
+Same Doppler config (same `NVM_API_KEY`, `NVM_PLAN_ID`, `NVM_AGENT_ID`). The script will order the plan (if not already ordered), get an x402 token, then `POST /query` with `payment-signature`. Expect a **200** and a JSON `result` — that’s a successful paid request; 1 credit is burned.
+
+**One-liner test (steps 5–8):** With the seller already running in another terminal:
+
+```bash
+doppler run -- npm run test:payment-flow
+```
+
+This runs: (1) curl without payment (402), (2) buyer script (order + token + call). Use it after the seller is up.
+
+---
 
 ## Local dev without Doppler
 
