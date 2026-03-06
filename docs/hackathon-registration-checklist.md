@@ -44,6 +44,7 @@ You already have `npm run register-agent`; use it with the **public URL** of you
 | **Services per request** | Critical | e.g. “One verification job: question + location in, artifact (photos + transcribed answer) out.” |
 | Endpoint URL | Auto | Filled from Nevermined agent registration. |
 | Price / metering | Auto | From your payment plan(s). |
+| **Request Structure** (help buyers integrate) | Critical | [hackathon-marketplace-integration.md](hackathon-marketplace-integration.md) — HTTP method, request body (JSON), response example (JSON). |
 
 Without at least one plan linked in Nevermined, the agent won’t appear in Sync; you’ve already created one plan via the script.
 

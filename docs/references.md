@@ -28,6 +28,7 @@
 
 ## Project docs
 
+- **Agent permissions (x402):** [docs/agent-permissions-x402.md](docs/agent-permissions-x402.md) — test4test USDC/USD plans accepted for payment.
 - **Doppler and env:** [docs/doppler-and-env.md](doppler-and-env.md) — secrets for seller/buyer, Doppler project link.
 - **Sandbox → prod:** [docs/sandbox-to-prod.md](sandbox-to-prod.md) — path from 5-min sandbox to production transaction.
 - **Buy from another agent:** [docs/buy-from-another-agent.md](buy-from-another-agent.md) — use the buyer script with another team’s plan/agent/URL and stash the response.

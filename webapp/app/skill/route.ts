@@ -1,10 +1,18 @@
 const API_BASE = "https://sabi-backend.ben-imadali.workers.dev";
+const WEBAPP_URL = "https://webapp-psi-inky.vercel.app";
+
+// Hackathon demo: AWS Builder Loft (SF)
+const DEMO_QUESTION = "Is the AWS vending machine Out of Order right now?";
+const DEMO_LAT = 37.7851;
+const DEMO_LNG = -122.3965;
 
 const SKILL = `# Sabi -- Real-World Verification
 
-Sabi gives your agent eyes on the physical world. When your agent needs to know something about a real place -- whether a store is open, how long a line is, what a sign says -- Sabi dispatches a human verifier who goes there, captures photos with smart glasses, and reports back.
+Sabi gives your agent eyes on the physical world. When your agent needs to know something about a real place -- whether a store is open, how long a line is, what a sign says, if equipment is working -- Sabi dispatches a human verifier who goes there, captures photos with smart glasses, and reports back.
 
 **Base URL:** \`${API_BASE}\`
+
+**Example prompt for users:** "Is the AWS vending machine Out of Order right now?" (or "Is there security at the front desk?")
 
 ## Step 1: Create an account
 
@@ -25,9 +33,9 @@ curl -s -X POST ${API_BASE}/api/verifications \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <apiKey>" \\
   -d '{
-    "question": "Is Blue Bottle Coffee on Market St open right now?",
-    "targetLat": 37.7830,
-    "targetLng": -122.4075
+    "question": "${DEMO_QUESTION}",
+    "targetLat": ${DEMO_LAT},
+    "targetLng": ${DEMO_LNG}
   }'
 # => HTTP 402, payment-required header contains base64-encoded plan info
 \`\`\`
@@ -87,9 +95,9 @@ curl -s -X POST ${API_BASE}/api/verifications \\
   -H "Authorization: Bearer <apiKey>" \\
   -H "payment-signature: <access-token>" \\
   -d '{
-    "question": "Is Blue Bottle Coffee on Market St open right now?",
-    "targetLat": 37.7830,
-    "targetLng": -122.4075
+    "question": "${DEMO_QUESTION}",
+    "targetLat": ${DEMO_LAT},
+    "targetLng": ${DEMO_LNG}
   }'
 \`\`\`
 
@@ -111,7 +119,25 @@ curl -s ${API_BASE}/api/verifications/<job-id>/artifact \\
   -H "Authorization: Bearer <apiKey>"
 \`\`\`
 
-Returns \`{"question": "...", "answer": "...", "frames": [{"url": "...", "timestamp": ...}, ...]}\`.
+Returns:
+\`\`\`json
+{
+  "question": "...",
+  "answer": "...",
+  "transcript": "...",
+  "frames": [{"url": "/api/frames/...", "fullUrl": "${API_BASE}/api/frames/...", "timestamp": ...}],
+  "viewUrl": "${WEBAPP_URL}/verify/<job-id>",
+  "apiBaseUrl": "${API_BASE}"
+}
+\`\`\`
+
+## Displaying results to the user
+
+**Primary:** Open \`viewUrl\` for the user. It is a hosted Sabi webapp page showing the question, verified answer, and photo evidence. The user may need to log in with their Sabi API key (from signup) if prompted.
+
+**Agent instructions:** When you receive the artifact, present the \`viewUrl\` to the user: "Your verification is ready. View the proof here: [viewUrl]". The user opens the link, logs in with their API key if needed, and sees the full result (answer + timestamped photos). This is the simplest way for the user to see the protected asset.
+
+**Frame URLs:** Each frame has \`fullUrl\` (hosted on our API). These require the user's \`Authorization: Bearer <apiKey>\` header to access. The \`viewUrl\` page handles auth and displays them. Do not embed frame URLs in public HTML without auth.
 
 ## When to use Sabi
 

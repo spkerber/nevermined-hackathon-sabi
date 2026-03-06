@@ -278,9 +278,11 @@ export default {
           createdAt: Date.now(),
         });
 
+        const webappUrl = (env.WEBAPP_URL ?? "https://webapp-psi-inky.vercel.app").replace(/\/$/, "");
         return json({
           job,
           websocketUrl: `/agents/verification-agent/${jobId}`,
+          viewUrl: `${webappUrl}/verify/${jobId}`,
           payment: {
             transaction: settlement.transaction,
             creditsRedeemed: settlement.creditsRedeemed,
@@ -465,7 +467,8 @@ export default {
     const artifactMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/artifact$/);
     if (artifactMatch && request.method === "GET") {
       try {
-        const agent = await getAgentByName(env.VerificationAgent, artifactMatch[1]);
+        const jobId = artifactMatch[1];
+        const agent = await getAgentByName(env.VerificationAgent, jobId);
         const status = await agent.getStatus();
 
         if (!status.job?.payment_tx) {
@@ -473,12 +476,19 @@ export default {
         }
 
         const artifact = await agent.getArtifact();
-        const baseUrl = `${url.protocol}//${url.host}`;
-        artifact.frames = artifact.frames.map((f) => ({
-          ...f,
-          url: `${baseUrl}${f.url}`,
-        }));
-        return json(artifact, 200, cors);
+        const webappUrl = (env.WEBAPP_URL ?? "https://webapp-psi-inky.vercel.app").replace(/\/$/, "");
+        const apiBaseUrl = url.origin;
+        const enrichedArtifact = {
+          ...artifact,
+          viewUrl: `${webappUrl}/verify/${jobId}`,
+          apiBaseUrl,
+          frames: artifact.frames.map((f) => ({
+            ...f,
+            url: `${apiBaseUrl}${f.url}`,
+            fullUrl: `${apiBaseUrl}${f.url}`,
+          })),
+        };
+        return json(enrichedArtifact, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }

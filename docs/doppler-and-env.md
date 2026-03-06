@@ -41,7 +41,7 @@ In the **Nevermined App**, your agent has an **API Configuration** section. Set 
 | **Protected API Endpoints** → POST | `https://sabi-backend.ben-imadali.workers.dev/query` |
 | **Agent Definition URL** | `https://sabi-backend.ben-imadali.workers.dev/` |
 
-After setting `APP_URL` in Doppler to your Cloudflare URL, use that same base above. You can re-run `npm run register-agent` to push the new URLs to Nevermined if the registration API updates the agent; otherwise edit these fields manually in the Nevermined App under your agent → API Configuration → *View and edit all API configuration details*.
+After setting `APP_URL` in Doppler to your Cloudflare URL, use that same base above. Add the **test4test USDC** and **test4test USD** plans to Protected API Endpoints (see [docs/agent-permissions-x402.md](agent-permissions-x402.md)). You can re-run `npm run register-agent` to push the new URLs to Nevermined if the registration API updates the agent; otherwise edit these fields manually in the Nevermined App under your agent → API Configuration → *View and edit all API configuration details*.
 
 We follow Nevermined’s **Static Resources Protection & Monetization** pattern: the Worker is the origin; Nevermined validates payment (x402) and may proxy to it. See [docs.nevermined.app](https://docs.nevermined.app/llms.txt) (doc index) and the [Static Resources Protection](https://nevermined.ai/docs/solutions/access-control-monetization-static-resources) guide.
 

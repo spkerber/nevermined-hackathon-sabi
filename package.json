@@ -27,5 +27,10 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "overrides": {
+    "qs": ">=6.14.2",
+    "@tootallnate/once": ">=3.0.1",
+    "langsmith": ">=0.4.6"
   }
 }
