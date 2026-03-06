@@ -199,22 +199,40 @@ struct VerificationJobView: View {
     isLoading = true
     errorMessage = nil
     do {
-      jobs = try await apiClient.listAvailableJobs()
+      let fetched = try await apiClient.listAvailableJobs()
+      if !Task.isCancelled {
+        jobs = fetched
+      }
+    } catch is CancellationError {
+    } catch let urlError as URLError where urlError.code == .cancelled {
     } catch {
-      errorMessage = error.localizedDescription
+      if !Task.isCancelled {
+        errorMessage = error.localizedDescription
+      }
     }
-    isLoading = false
+    if !Task.isCancelled {
+      isLoading = false
+    }
   }
 
   private func loadMyJobs() async {
     isLoading = true
     errorMessage = nil
     do {
-      myJobs = try await apiClient.listMyVerifications(verifierId: "iphone-verifier")
+      let fetched = try await apiClient.listMyVerifications(verifierId: "iphone-verifier")
+      if !Task.isCancelled {
+        myJobs = fetched
+      }
+    } catch is CancellationError {
+    } catch let urlError as URLError where urlError.code == .cancelled {
     } catch {
-      errorMessage = error.localizedDescription
+      if !Task.isCancelled {
+        errorMessage = error.localizedDescription
+      }
     }
-    isLoading = false
+    if !Task.isCancelled {
+      isLoading = false
+    }
   }
 
   private func seedAndRefresh() async {
@@ -222,11 +240,20 @@ struct VerificationJobView: View {
     errorMessage = nil
     do {
       try await apiClient.seedJobs()
-      jobs = try await apiClient.listAvailableJobs()
+      let fetched = try await apiClient.listAvailableJobs()
+      if !Task.isCancelled {
+        jobs = fetched
+      }
+    } catch is CancellationError {
+    } catch let urlError as URLError where urlError.code == .cancelled {
     } catch {
-      errorMessage = error.localizedDescription
+      if !Task.isCancelled {
+        errorMessage = error.localizedDescription
+      }
     }
-    isLoading = false
+    if !Task.isCancelled {
+      isLoading = false
+    }
   }
 
   private func acceptJob(_ job: AvailableJob) async {

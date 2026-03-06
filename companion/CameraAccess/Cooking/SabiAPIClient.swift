@@ -55,7 +55,9 @@ class SabiAPIClient: ObservableObject {
 
   // List available verification jobs
   func listAvailableJobs() async throws -> [AvailableJob] {
-    var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications")!)
+    let urlString = "\(baseURL)/api/verifications"
+    NSLog("[SabiAPI] listAvailableJobs → %@", urlString)
+    var request = URLRequest(url: URL(string: urlString)!)
     request.httpMethod = "GET"
 
     let (data, response) = try await URLSession.shared.data(for: request)
