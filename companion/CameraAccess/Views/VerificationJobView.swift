@@ -210,6 +210,7 @@ struct VerificationJobView: View {
   private func loadJobs() async {
     isLoading = true
     errorMessage = nil
+    defer { isLoading = false }
     do {
       let fetched = try await apiClient.listAvailableJobs()
       if !Task.isCancelled {
@@ -222,14 +223,12 @@ struct VerificationJobView: View {
         errorMessage = error.localizedDescription
       }
     }
-    if !Task.isCancelled {
-      isLoading = false
-    }
   }
 
   private func loadMyJobs() async {
     isLoading = true
     errorMessage = nil
+    defer { isLoading = false }
     do {
       let fetched = try await apiClient.listMyVerifications(verifierId: "iphone-verifier")
       if !Task.isCancelled {
@@ -242,14 +241,12 @@ struct VerificationJobView: View {
         errorMessage = error.localizedDescription
       }
     }
-    if !Task.isCancelled {
-      isLoading = false
-    }
   }
 
   private func seedAndRefresh() async {
     isLoading = true
     errorMessage = nil
+    defer { isLoading = false }
     do {
       try await apiClient.seedJobs()
       let fetched = try await apiClient.listAvailableJobs()
@@ -262,9 +259,6 @@ struct VerificationJobView: View {
       if !Task.isCancelled {
         errorMessage = error.localizedDescription
       }
-    }
-    if !Task.isCancelled {
-      isLoading = false
     }
   }
 
