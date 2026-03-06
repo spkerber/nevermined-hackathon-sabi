@@ -1,6 +1,12 @@
 import { routeAgentRequest, getAgentByName } from "agents";
 import type { Env } from "./types";
 import type { JobRegistry } from "./job-registry";
+import {
+  getPaymentRequired,
+  build402Response,
+  verifyPayment,
+  settlePayment,
+} from "./nevermined";
 
 export { VerificationAgent } from "./verification-agent";
 export { JobRegistry } from "./job-registry";
@@ -9,7 +15,8 @@ function corsHeaders(origin: string | null): HeadersInit {
   return {
     "Access-Control-Allow-Origin": origin ?? "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade, payment-signature",
+    "Access-Control-Expose-Headers": "payment-required, payment-response",
   };
 }
 
@@ -40,7 +47,12 @@ export default {
     }
 
     if (url.pathname === "/api/config" && request.method === "GET") {
-      return json({ apiBaseUrl: url.origin }, 200, cors);
+      return json({
+        apiBaseUrl: url.origin,
+        nvmEnvironment: env.NVM_ENVIRONMENT,
+        nvmPlanId: env.NVM_PLAN_ID,
+        nvmAgentId: env.NVM_AGENT_ID,
+      }, 200, cors);
     }
 
     if (url.pathname.startsWith("/agents/")) {
@@ -63,9 +75,22 @@ export default {
       }
     }
 
-    // ── POST /api/verifications ── Create a new verification job
+    // ── POST /api/verifications ── Create a new verification job (payment required)
     if (url.pathname === "/api/verifications" && request.method === "POST") {
       try {
+        const paymentRequired = getPaymentRequired(env, "/api/verifications", "POST");
+        const accessToken = request.headers.get("payment-signature");
+
+        if (!accessToken) {
+          return build402Response(paymentRequired, cors);
+        }
+
+        // Verify the requester has sufficient credits
+        const verification = await verifyPayment(env, accessToken, paymentRequired, 1n);
+        if (!verification.isValid) {
+          return build402Response(paymentRequired, cors);
+        }
+
         const body = await request.json() as {
           question: string;
           category?: string;
@@ -77,6 +102,12 @@ export default {
 
         if (!body.question || body.targetLat == null || body.targetLng == null) {
           return json({ error: "Missing required fields: question, targetLat, targetLng" }, 400, cors);
+        }
+
+        // Settle (burn) credits upfront before creating the job
+        const settlement = await settlePayment(env, accessToken, paymentRequired, 1n);
+        if (!settlement.success) {
+          return json({ error: "Payment settlement failed" }, 402, cors);
         }
 
         const jobId = crypto.randomUUID();
@@ -91,6 +122,7 @@ export default {
           targetLat: body.targetLat,
           targetLng: body.targetLng,
           requesterId: body.requesterId ?? "anonymous",
+          paymentTx: settlement.transaction,
         });
 
         const registry = getRegistry(env);
@@ -109,6 +141,11 @@ export default {
         return json({
           job,
           websocketUrl: `/agents/verification-agent/${jobId}`,
+          payment: {
+            transaction: settlement.transaction,
+            creditsRedeemed: settlement.creditsRedeemed,
+            remainingBalance: settlement.remainingBalance,
+          },
         }, 201, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
@@ -285,11 +322,18 @@ export default {
       }
     }
 
-    // ── GET /api/verifications/:id/artifact ── Get the completed artifact
+    // ── GET /api/verifications/:id/artifact ── Get the completed artifact (payment-gated)
     const artifactMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/artifact$/);
     if (artifactMatch && request.method === "GET") {
       try {
         const agent = await getAgentByName(env.VerificationAgent, artifactMatch[1]);
+        const status = await agent.getStatus();
+
+        // Only serve artifact if the job was paid for
+        if (!status.job?.payment_tx) {
+          return json({ error: "Payment required to access artifact" }, 402, cors);
+        }
+
         const artifact = await agent.getArtifact();
         return json(artifact, 200, cors);
       } catch (err) {
@@ -297,10 +341,25 @@ export default {
       }
     }
 
-    // ── GET /api/frames/:key+ ── Serve a frame image from R2
+    // ── GET /api/frames/:key+ ── Serve a frame image from R2 (payment-gated)
     const framesServeMatch = url.pathname.match(/^\/api\/frames\/(.+)$/);
     if (framesServeMatch && request.method === "GET") {
       const r2Key = framesServeMatch[1];
+
+      // Extract jobId from the r2Key (format: jobId/timestamp.jpg)
+      const jobId = r2Key.split("/")[0];
+      if (jobId) {
+        try {
+          const agent = await getAgentByName(env.VerificationAgent, jobId);
+          const status = await agent.getStatus();
+          if (!status.job?.payment_tx) {
+            return json({ error: "Payment required to access frames" }, 402, cors);
+          }
+        } catch {
+          return json({ error: "Job not found" }, 404, cors);
+        }
+      }
+
       const object = await env.FRAMES.get(r2Key);
 
       if (!object) {

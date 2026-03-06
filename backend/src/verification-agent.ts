@@ -32,6 +32,7 @@ export class VerificationAgent extends Agent<Env, AgentState> {
     targetLat: number;
     targetLng: number;
     requesterId: string;
+    paymentTx?: string;
   }) {
     const now = Date.now();
     const job: VerificationJob = {
@@ -45,6 +46,7 @@ export class VerificationAgent extends Agent<Env, AgentState> {
       verifier_id: null,
       answer: null,
       transcript: null,
+      payment_tx: params.paymentTx ?? null,
       created_at: now,
       updated_at: now,
     };

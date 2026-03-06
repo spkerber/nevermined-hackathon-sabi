@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createVerification, listMyVerifications } from "@/lib/api";
+import { createVerification, listMyVerifications, getConfig, PaymentRequiredError } from "@/lib/api";
 import { validateQuestion } from "@/lib/validate-question";
+import { getStoredApiKey, storeApiKey, clearApiKey, getX402AccessToken, getNvmAppUrl } from "@/lib/nevermined";
 
 interface MyJob {
   id: string;
@@ -42,6 +43,10 @@ export default function Home() {
   const [suggestion, setSuggestion] = useState("");
   const [myJobs, setMyJobs] = useState<MyJob[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
+  const [nvmApiKey, setNvmApiKey] = useState<string | null>(null);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [nvmConfig, setNvmConfig] = useState<{ nvmEnvironment: string; nvmPlanId: string; nvmAgentId: string } | null>(null);
 
   const requesterId = typeof window !== "undefined" ? getRequesterId() : "anonymous";
 
@@ -58,6 +63,12 @@ export default function Home() {
   useEffect(() => {
     loadMyJobs();
   }, [loadMyJobs]);
+
+  // Load stored API key and backend config
+  useEffect(() => {
+    setNvmApiKey(getStoredApiKey());
+    getConfig().then(setNvmConfig).catch(console.error);
+  }, []);
 
   // Live validation as user types
   useEffect(() => {
@@ -76,6 +87,20 @@ export default function Home() {
     }
   }, [question]);
 
+  function handleSaveApiKey() {
+    const key = apiKeyInput.trim();
+    if (!key) return;
+    storeApiKey(key);
+    setNvmApiKey(key);
+    setShowApiKeyInput(false);
+    setApiKeyInput("");
+  }
+
+  function handleDisconnect() {
+    clearApiKey();
+    setNvmApiKey(null);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = question.trim();
@@ -87,19 +112,42 @@ export default function Home() {
       return;
     }
 
+    if (!nvmApiKey) {
+      setShowApiKeyInput(true);
+      return;
+    }
+
+    if (!nvmConfig) {
+      setError("Loading payment config... Please try again.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      const result = await createVerification({
-        question: trimmed,
-        targetLat: 37.7749,
-        targetLng: -122.4194,
-        requesterId,
-      });
+      const token = await getX402AccessToken(
+        nvmApiKey,
+        nvmConfig.nvmEnvironment,
+        nvmConfig.nvmPlanId,
+        nvmConfig.nvmAgentId,
+      );
+      const result = await createVerification(
+        {
+          question: trimmed,
+          targetLat: 37.7749,
+          targetLng: -122.4194,
+          requesterId,
+        },
+        token,
+      );
       router.push(`/verify/${result.job.id}`);
     } catch (err) {
-      setError((err as Error).message);
+      if (err instanceof PaymentRequiredError) {
+        setError("Insufficient credits. Please purchase credits on Nevermined first.");
+      } else {
+        setError((err as Error).message);
+      }
     } finally {
       setLoading(false);
     }
@@ -116,6 +164,70 @@ export default function Home() {
             Get verified, photo-evidenced answers to real-world questions.
           </p>
         </div>
+
+        {/* Nevermined connection status */}
+        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${nvmApiKey ? "bg-emerald-500" : "bg-zinc-600"}`} />
+            <span className="text-sm text-zinc-400">
+              {nvmApiKey ? "Nevermined connected" : "Not connected"}
+            </span>
+          </div>
+          {nvmApiKey ? (
+            <button
+              onClick={handleDisconnect}
+              className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
+            >
+              Disconnect
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowApiKeyInput(true)}
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Connect
+            </button>
+          )}
+        </div>
+
+        {/* API Key input */}
+        {showApiKeyInput && !nvmApiKey && (
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+            <p className="text-sm text-zinc-300">
+              Enter your Nevermined API key to pay for verifications.
+              {nvmConfig && (
+                <>
+                  {" "}
+                  <a
+                    href={getNvmAppUrl(nvmConfig.nvmEnvironment)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 underline"
+                  >
+                    Get one here
+                  </a>
+                </>
+              )}
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="sandbox:eyJ..."
+                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onKeyDown={(e) => e.key === "Enter" && handleSaveApiKey()}
+              />
+              <button
+                onClick={handleSaveApiKey}
+                disabled={!apiKeyInput.trim()}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -155,7 +267,11 @@ export default function Home() {
             disabled={loading || !isValid}
             className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? "Submitting..." : "Request Verification — $5"}
+            {loading
+              ? "Processing payment..."
+              : !nvmApiKey
+                ? "Connect & Request Verification"
+                : "Request Verification — 1 Credit"}
           </button>
         </form>
 

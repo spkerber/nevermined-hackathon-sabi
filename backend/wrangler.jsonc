@@ -33,7 +33,7 @@
     }
   ],
   "vars": {
-    "NVM_ENVIRONMENT": "testing"
+    "NVM_ENVIRONMENT": "sandbox"
   }
   // Secrets (set via `wrangler secret put`):
   // NVM_API_KEY, NVM_PLAN_ID, NVM_AGENT_ID

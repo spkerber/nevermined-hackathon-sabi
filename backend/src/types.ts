@@ -21,6 +21,7 @@ export interface VerificationJob {
   verifier_id: string | null;
   answer: string | null;
   transcript: string | null;
+  payment_tx: string | null;
   created_at: number;
   updated_at: number;
 }
