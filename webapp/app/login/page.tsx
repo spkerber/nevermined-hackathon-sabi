@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAuth, setAuth } from "@/lib/auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://sabi-backend.ben-imadali.workers.dev";
 
 function LoginForm() {
   const router = useRouter();

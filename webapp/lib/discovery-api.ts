@@ -4,7 +4,7 @@
  * Backend proxies to GET {HACKATHON_DISCOVERY_BASE_URL}/hackathon/register/api/discover
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://sabi-backend.ben-imadali.workers.dev";
 
 export type DiscoverSide = "sell" | "buy";
 

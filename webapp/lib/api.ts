@@ -1,6 +1,6 @@
 import { authHeaders } from "./auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://sabi-backend.ben-imadali.workers.dev";
 
 export class PaymentRequiredError extends Error {
   public paymentInfo?: Record<string, unknown>;
