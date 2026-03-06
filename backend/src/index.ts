@@ -473,6 +473,11 @@ export default {
         }
 
         const artifact = await agent.getArtifact();
+        const baseUrl = `${url.protocol}//${url.host}`;
+        artifact.frames = artifact.frames.map((f) => ({
+          ...f,
+          url: `${baseUrl}${f.url}`,
+        }));
         return json(artifact, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
