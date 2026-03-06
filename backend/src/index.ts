@@ -396,12 +396,23 @@ export default {
         }
 
         // Get access token using our server key + buyer's agent ID
-        const accessToken = await getX402AccessToken(env, buyerAgentId);
+        let accessToken: string;
+        try {
+          accessToken = await getX402AccessToken(env, buyerAgentId);
+        } catch (tokenErr) {
+          const msg = (tokenErr as Error).message ?? "";
+          if (msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("agent")) {
+            return json({
+              error: `Nevermined Agent ID "${buyerAgentId}" is not registered on the Nevermined platform. Register your agent at https://nevermined.app or update your agent ID via PUT /api/auth/nvm-agent-id with a valid Nevermined agent ID.`,
+            }, 402, cors);
+          }
+          throw tokenErr;
+        }
 
         // Verify the requester has sufficient credits
         const verification = await verifyPayment(env, accessToken, paymentRequired, 1n);
         if (!verification.isValid) {
-          return json({ error: "Insufficient credits. Purchase more on Nevermined." }, 402, cors);
+          return json({ error: "Insufficient credits. Purchase more at https://nevermined.app" }, 402, cors);
         }
 
         const body = await request.json() as {

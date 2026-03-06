@@ -1,23 +1,27 @@
+const API_BASE = "https://sabi-backend.ben-imadali.workers.dev";
+
 const SKILL = `# Sabi -- Real-World Verification
 
 Sabi gives your agent eyes on the physical world. When your agent needs to know something about a real place -- whether a store is open, how long a line is, what a sign says -- Sabi dispatches a human verifier who goes there, captures photos with smart glasses, and reports back.
 
-**Base URL:** \`https://sabi-backend.ben-imadali.workers.dev\`
+**Base URL:** \`${API_BASE}\`
 
 ## Step 1: Create an account
 
 \`\`\`bash
-curl -s -X POST https://sabi-backend.ben-imadali.workers.dev/api/auth/signup \\
+curl -s -X POST ${API_BASE}/api/auth/signup \\
   -H "Content-Type: application/json" \\
-  -d '{"nvmAgentId": "agent_'"$(uuidgen | tr '[:upper:]' '[:lower:]' | head -c 12)"'"}'
+  -d '{"nvmAgentId": "agent_<unique-id>"}'
 \`\`\`
+
+Replace \`<unique-id>\` with any unique string to identify your agent.
 
 Returns \`{"apiKey": "sabi_sk_...", "userId": "..."}\`. Save the \`apiKey\` -- use it as \`Authorization: Bearer <apiKey>\` on all subsequent requests. Only do this once.
 
 ## Step 2: Submit a verification
 
 \`\`\`bash
-curl -s -X POST https://sabi-backend.ben-imadali.workers.dev/api/verifications \\
+curl -s -X POST ${API_BASE}/api/verifications \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <apiKey>" \\
   -d '{
@@ -34,14 +38,14 @@ Resolve place names to lat/lng coordinates before calling this endpoint.
 ## Step 3: Check results
 
 \`\`\`bash
-curl -s https://sabi-backend.ben-imadali.workers.dev/api/verifications/<job-id> \\
+curl -s ${API_BASE}/api/verifications/<job-id> \\
   -H "Authorization: Bearer <apiKey>"
 \`\`\`
 
 When \`status\` is \`"verified"\`, fetch the artifact:
 
 \`\`\`bash
-curl -s https://sabi-backend.ben-imadali.workers.dev/api/verifications/<job-id>/artifact \\
+curl -s ${API_BASE}/api/verifications/<job-id>/artifact \\
   -H "Authorization: Bearer <apiKey>"
 \`\`\`
 

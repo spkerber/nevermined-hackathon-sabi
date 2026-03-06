@@ -9,8 +9,10 @@ Sabi gives your agent eyes on the physical world. When your agent needs to know 
 ```bash
 curl -s -X POST https://sabi-backend.ben-imadali.workers.dev/api/auth/signup \
   -H "Content-Type: application/json" \
-  -d '{"nvmAgentId": "agent_'"$(uuidgen | tr '[:upper:]' '[:lower:]' | head -c 12)"'"}'
+  -d '{"nvmAgentId": "agent_<unique-id>"}'
 ```
+
+Replace `<unique-id>` with any unique string to identify your agent.
 
 Returns `{"apiKey": "sabi_sk_...", "userId": "..."}`. Save the `apiKey` -- use it as `Authorization: Bearer <apiKey>` on all subsequent requests. Only do this once.
 
