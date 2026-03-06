@@ -216,7 +216,7 @@ const client = new SabiClient({
   <tr><td>getStatus(jobId)</td><td>AgentState</td><td>Get current job status, frames, and answer.</td></tr>
   <tr><td>listJobs(filter?)</td><td>JobListEntry[]</td><td>List jobs, optionally filtered by requesterId or verifierId.</td></tr>
   <tr><td>getArtifact(jobId)</td><td>Artifact</td><td>Get completed artifact (answer + photo URLs).</td></tr>
-  <tr><td>getFrameUrl(r2Key)</td><td>string</td><td>Build the full URL for a frame image.</td></tr>
+  <tr><td>getFrameUrl(r2Key)</td><td>string</td><td>Build the full URL for a frame image. <em>Note: artifact frames now include fully qualified URLs, so this is only needed for frame references from other endpoints.</em></td></tr>
   <tr><td>watchJob(jobId)</td><td>JobWatcher</td><td>WebSocket connection for real-time state updates.</td></tr>
   <tr><td>getPlatformConfig()</td><td>PlatformConfig</td><td>Fetch Nevermined plan/agent IDs from the backend.</td></tr>
 </table>
@@ -255,7 +255,7 @@ console.log("Question:", artifact.question);
 console.log("Answer:", artifact.answer);
 console.log("Transcript:", artifact.transcript);
 for (const frame of artifact.frames) {
-  console.log(`  Photo: ${client.getFrameUrl(frame.url)} at ${new Date(frame.timestamp)}`);
+  console.log(`  Photo: ${frame.url} at ${new Date(frame.timestamp)}`);
 }</code></pre>
 
 <h2>Error Handling</h2>
@@ -566,7 +566,7 @@ sabi config --reset</code></pre>
   "question": "Is the coffee shop open?",
   "answer": "Yes, open until 9pm.",
   "transcript": "...",
-  "frames": [{ "url": "uuid/1709654400000.jpg", "timestamp": 1709654400000 }]
+  "frames": [{ "url": "https://api.example.com/api/frames/uuid/1709654400000.jpg", "timestamp": 1709654400000 }]
 }</code></pre>
   <p><span class="status-badge s4xx">402</span> Job was not paid for</p>
 </div>
