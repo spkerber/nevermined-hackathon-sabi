@@ -123,7 +123,7 @@ class SabiAPIClient: ObservableObject {
   // List jobs for a verifier (their history)
   func listMyVerifications(verifierId: String) async throws -> [AvailableJob] {
     try await ensureAuthenticated()
-    var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications?verifierId=\(verifierId)")!)
+    var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications?mine=true")!)
     request.httpMethod = "GET"
     addAuth(&request)
 

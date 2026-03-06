@@ -371,8 +371,9 @@ export default {
     if (url.pathname === "/api/verifications" && request.method === "GET") {
       try {
         const registry = getRegistry(env);
+        const mine = url.searchParams.get("mine");
         const requesterId = url.searchParams.get("requesterId");
-        const verifierId = url.searchParams.get("verifierId");
+        const verifierId = mine === "true" ? user.id : url.searchParams.get("verifierId");
         const jobs = await registry.listJobs(
           requesterId ? { requesterId } : verifierId ? { verifierId } : undefined
         );
