@@ -32,6 +32,19 @@ Secrets and config are managed via **Doppler** in CI/deploy; for local dev you c
 3. **Hackathon marketplace:** In the team/agent listing, set **Endpoint URL** to `APP_URL/query` (e.g. `https://sabi-api.workers.dev/query`).
 4. **Cloudflare Worker env:** If the seller runs on Workers, set `APP_URL` (or the equivalent) in the Worker’s env / secrets so it can report the correct URL if needed.
 
+### Nevermined App — API Configuration (replace old URL)
+
+In the **Nevermined App**, your agent has an **API Configuration** section. Replace the old base URL (e.g. `https://spkerber.com`) with your Cloudflare base URL so buyers and the proxy hit the right origin.
+
+| Field | Set to |
+|-------|--------|
+| **Protected API Endpoints** → POST | `APP_URL/query` (e.g. `https://your-worker.workers.dev/query`) |
+| **Agent Definition URL** | `APP_URL/` (e.g. `https://your-worker.workers.dev/`) |
+
+After setting `APP_URL` in Doppler to your Cloudflare URL, use that same base above. You can re-run `npm run register-agent` to push the new URLs to Nevermined if the registration API updates the agent; otherwise edit these fields manually in the Nevermined App under your agent → API Configuration → *View and edit all API configuration details*.
+
+We follow Nevermined’s **Static Resources Protection & Monetization** pattern: the Worker is the origin; Nevermined validates payment (x402) and may proxy to it. See [docs.nevermined.app](https://docs.nevermined.app/llms.txt) (doc index) and the [Static Resources Protection](https://nevermined.ai/docs/solutions/access-control-monetization-static-resources) guide.
+
 ## Buyer (subscriber) usage
 
 **Recommended for solo testing:** Use the **same** `NVM_API_KEY` for both registering the agent (seller) and testing as buyer. One Doppler config with that key plus `NVM_AGENT_ID` and `NVM_PLAN_ID` is enough: run `register-agent`, run the seller, then run the buyer script with the same key — you’re the subscriber to your own plan.
