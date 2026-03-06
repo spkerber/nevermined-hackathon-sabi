@@ -22,7 +22,7 @@ export const configCmd = new Command("config")
         console.log();
         console.log("  Set with: sabi config <key> <value>");
         console.log("  Keys: apiUrl, nvmApiKey");
-        console.log("  Env vars: SABI_API_URL, SABI_NVM_API_KEY, NVM_API_KEY");
+        console.log("  Env vars: SABI_API_URL, SABI_API_KEY, SABI_NVM_API_KEY, NVM_API_KEY");
         console.log();
         return;
       }
@@ -31,7 +31,7 @@ export const configCmd = new Command("config")
         const config = loadConfig();
         const val = (config as Record<string, string | undefined>)[key];
         if (val !== undefined) {
-          console.log(`\n  ${key}: ${key === "nvmApiKey" ? val.slice(0, 8) + "..." : val}\n`);
+          console.log(`\n  ${key}: ${key === "nvmApiKey" || key === "apiKey" ? val.slice(0, 8) + "..." : val}\n`);
         } else {
           console.log(`\n  Unknown key: ${key}\n`);
         }

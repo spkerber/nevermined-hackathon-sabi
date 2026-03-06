@@ -10,6 +10,7 @@ final class SettingsManager {
     case geminiSystemPrompt
     case workerURL
     case workerToken
+    case sabiApiKey
   }
 
   private init() {}
@@ -43,10 +44,17 @@ final class SettingsManager {
     set { defaults.set(newValue, forKey: Key.workerURL.rawValue) }
   }
 
+  // MARK: - Sabi Auth
+
+  var sabiApiKey: String? {
+    get { defaults.string(forKey: Key.sabiApiKey.rawValue) ?? Secrets.sabiApiKey }
+    set { defaults.set(newValue, forKey: Key.sabiApiKey.rawValue) }
+  }
+
   // MARK: - Reset
 
   func resetAll() {
-    for key in [Key.geminiAPIKey, .geminiSystemPrompt, .workerURL, .workerToken] {
+    for key in [Key.geminiAPIKey, .geminiSystemPrompt, .workerURL, .workerToken, .sabiApiKey] {
       defaults.removeObject(forKey: key.rawValue)
     }
   }

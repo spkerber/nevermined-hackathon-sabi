@@ -1,7 +1,6 @@
 import { EventEmitter } from "events";
 import { resolveConfig } from "./config.js";
 import { ApiError, PaymentRequiredError } from "./errors.js";
-import { getX402AccessToken } from "./nevermined.js";
 import type {
   SabiConfig,
   PlatformConfig,
@@ -65,8 +64,15 @@ export class SabiClient {
     return this.config.apiUrl.replace(/\/$/, "");
   }
 
+  private get authHeaders(): Record<string, string> {
+    return this.config.apiKey
+      ? { Authorization: `Bearer ${this.config.apiKey}` }
+      : {};
+  }
+
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, init);
+    const headers = { ...this.authHeaders, ...init?.headers };
+    const res = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
 
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as Record<string, string>;
@@ -82,45 +88,23 @@ export class SabiClient {
     return this.platformConfig;
   }
 
-  private async getPaymentToken(): Promise<string> {
-    if (!this.config.nvmApiKey) {
-      throw new PaymentRequiredError();
-    }
-    const platform = await this.getPlatformConfig();
-    return getX402AccessToken(
-      this.config.nvmApiKey,
-      platform.nvmEnvironment,
-      platform.nvmPlanId,
-      platform.nvmAgentId,
-    );
+  async signup(nvmApiKey: string): Promise<{ apiKey: string; userId: string }> {
+    return this.request("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nvmApiKey }),
+    });
   }
 
   async createVerification(
     params: CreateVerificationParams,
   ): Promise<CreateVerificationResult> {
-    const token = await this.getPaymentToken();
-
-    const res = await fetch(`${this.baseUrl}/api/verifications`, {
+    // Payment is resolved server-side from the stored NVM key
+    return this.request("/api/verifications", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "payment-signature": token,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-
-    if (res.status === 402) {
-      throw new PaymentRequiredError(
-        "Insufficient credits or expired token. Order the plan at https://sandbox.nevermined.app",
-      );
-    }
-
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as Record<string, string>;
-      throw new ApiError(res.status, body.error ?? "Create verification failed");
-    }
-
-    return res.json() as Promise<CreateVerificationResult>;
   }
 
   async getStatus(jobId: string): Promise<AgentState> {
@@ -152,7 +136,8 @@ export class SabiClient {
   watchJob(jobId: string): JobWatcher {
     const watcher = new JobWatcher();
     const wsBase = this.baseUrl.replace(/^http/, "ws");
-    watcher._start(`${wsBase}/agents/verification-agent/${jobId}`);
+    const qs = this.config.apiKey ? `?apiKey=${encodeURIComponent(this.config.apiKey)}` : "";
+    watcher._start(`${wsBase}/agents/verification-agent/${jobId}${qs}`);
     return watcher;
   }
 }

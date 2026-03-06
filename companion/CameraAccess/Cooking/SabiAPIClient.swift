@@ -53,12 +53,19 @@ class SabiAPIClient: ObservableObject {
 
   private var baseURL: String { SabiConfig.url }
 
+  private func addAuth(_ request: inout URLRequest) {
+    if let apiKey = SettingsManager.shared.sabiApiKey {
+      request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    }
+  }
+
   // List available verification jobs
   func listAvailableJobs() async throws -> [AvailableJob] {
     let urlString = "\(baseURL)/api/verifications"
     NSLog("[SabiAPI] listAvailableJobs → %@", urlString)
     var request = URLRequest(url: URL(string: urlString)!)
     request.httpMethod = "GET"
+    addAuth(&request)
 
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -75,6 +82,7 @@ class SabiAPIClient: ObservableObject {
     var request = URLRequest(url: URL(string: "\(baseURL)/api/seed")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    addAuth(&request)
 
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -87,6 +95,7 @@ class SabiAPIClient: ObservableObject {
   func listMyVerifications(verifierId: String) async throws -> [AvailableJob] {
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications?verifierId=\(verifierId)")!)
     request.httpMethod = "GET"
+    addAuth(&request)
 
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -103,6 +112,7 @@ class SabiAPIClient: ObservableObject {
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)/cancel")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    addAuth(&request)
 
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -121,6 +131,7 @@ class SabiAPIClient: ObservableObject {
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)/accept")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    addAuth(&request)
     request.httpBody = body
 
     let (data, response) = try await URLSession.shared.data(for: request)
@@ -141,6 +152,7 @@ class SabiAPIClient: ObservableObject {
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)/start")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    addAuth(&request)
 
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -164,6 +176,7 @@ class SabiAPIClient: ObservableObject {
       var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)/frames")!)
       request.httpMethod = "POST"
       request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+      addAuth(&request)
       request.httpBody = jpegData
 
       let (_, resp) = try await URLSession.shared.data(for: request)
@@ -188,6 +201,7 @@ class SabiAPIClient: ObservableObject {
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)/end")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    addAuth(&request)
     request.httpBody = body
 
     let (data, response) = try await URLSession.shared.data(for: request)
@@ -204,6 +218,7 @@ class SabiAPIClient: ObservableObject {
   func getJobStatus(jobId: String) async throws -> JobStatusResponse {
     var request = URLRequest(url: URL(string: "\(baseURL)/api/verifications/\(jobId)")!)
     request.httpMethod = "GET"
+    addAuth(&request)
 
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {

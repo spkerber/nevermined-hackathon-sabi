@@ -1,11 +1,18 @@
 export interface Env {
   VerificationAgent: DurableObjectNamespace;
   JobRegistry: DurableObjectNamespace;
+  AuthRegistry: DurableObjectNamespace;
   FRAMES: R2Bucket;
   NVM_API_KEY: string;
   NVM_ENVIRONMENT: string;
   NVM_PLAN_ID: string;
   NVM_AGENT_ID: string;
+  GITHUB_CLIENT_ID: string;
+  GITHUB_CLIENT_SECRET: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  /** URL of the webapp (e.g. https://sabi.vercel.app). Used for OAuth redirects. */
+  AUTH_REDIRECT_URL: string;
   /** Base URL of hackathon registration site (e.g. https://hackathon.example.com). Used for Discovery API proxy. */
   HACKATHON_DISCOVERY_BASE_URL?: string;
 }

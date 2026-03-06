@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createVerification, listMyVerifications, getConfig, PaymentRequiredError } from "@/lib/api";
+import { createVerification, listMyVerifications, getMe, saveNvmKey, getConfig, PaymentRequiredError } from "@/lib/api";
 import { validateQuestion } from "@/lib/validate-question";
-import { getStoredApiKey, storeApiKey, clearApiKey, getX402AccessToken, getNvmAppUrl } from "@/lib/nevermined";
+import { getNvmAppUrl } from "@/lib/nevermined";
+import { getAuth, clearAuth, type AuthState } from "@/lib/auth";
 
 interface MyJob {
   id: string;
@@ -24,18 +25,11 @@ const STATUS_STYLES: Record<string, { label: string; color: string }> = {
   cancelled: { label: "Cancelled", color: "bg-zinc-500" },
 };
 
-function getRequesterId(): string {
-  if (typeof window === "undefined") return "anonymous";
-  let id = localStorage.getItem("sabi_requester_id");
-  if (!id) {
-    id = `req_${crypto.randomUUID().slice(0, 8)}`;
-    localStorage.setItem("sabi_requester_id", id);
-  }
-  return id;
-}
-
 export default function Home() {
   const router = useRouter();
+  const [auth, setAuthState] = useState<AuthState | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [hasNvmKey, setHasNvmKey] = useState(false);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -43,32 +37,43 @@ export default function Home() {
   const [suggestion, setSuggestion] = useState("");
   const [myJobs, setMyJobs] = useState<MyJob[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
-  const [nvmApiKey, setNvmApiKey] = useState<string | null>(null);
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState("");
-  const [nvmConfig, setNvmConfig] = useState<{ nvmEnvironment: string; nvmPlanId: string; nvmAgentId: string } | null>(null);
+  const [showNvmInput, setShowNvmInput] = useState(false);
+  const [nvmKeyInput, setNvmKeyInput] = useState("");
+  const [savingNvm, setSavingNvm] = useState(false);
+  const [nvmConfig, setNvmConfig] = useState<{ nvmEnvironment: string } | null>(null);
 
-  const requesterId = typeof window !== "undefined" ? getRequesterId() : "anonymous";
+  // Check auth on mount
+  useEffect(() => {
+    const current = getAuth();
+    if (!current) {
+      router.replace("/login");
+      return;
+    }
+    setAuthState(current);
+
+    // Fetch server-side NVM key status
+    getMe().then((me) => {
+      if (me) setHasNvmKey(me.hasNvmKey);
+      setAuthChecked(true);
+    }).catch(() => setAuthChecked(true));
+
+    getConfig().then(setNvmConfig).catch(console.error);
+  }, [router]);
 
   const loadMyJobs = useCallback(async () => {
+    if (!auth) return;
     try {
-      const result = await listMyVerifications(requesterId);
+      const result = await listMyVerifications(auth.userId);
       setMyJobs(result.jobs);
     } catch {
       // silently fail
     }
     setLoadingJobs(false);
-  }, [requesterId]);
+  }, [auth]);
 
   useEffect(() => {
-    loadMyJobs();
-  }, [loadMyJobs]);
-
-  // Load stored API key and backend config
-  useEffect(() => {
-    setNvmApiKey(getStoredApiKey());
-    getConfig().then(setNvmConfig).catch(console.error);
-  }, []);
+    if (authChecked) loadMyJobs();
+  }, [authChecked, loadMyJobs]);
 
   // Live validation as user types
   useEffect(() => {
@@ -87,18 +92,25 @@ export default function Home() {
     }
   }, [question]);
 
-  function handleSaveApiKey() {
-    const key = apiKeyInput.trim();
+  async function handleSaveNvmKey() {
+    const key = nvmKeyInput.trim();
     if (!key) return;
-    storeApiKey(key);
-    setNvmApiKey(key);
-    setShowApiKeyInput(false);
-    setApiKeyInput("");
+    setSavingNvm(true);
+    try {
+      await saveNvmKey(key);
+      setHasNvmKey(true);
+      setShowNvmInput(false);
+      setNvmKeyInput("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingNvm(false);
+    }
   }
 
-  function handleDisconnect() {
-    clearApiKey();
-    setNvmApiKey(null);
+  function handleSignOut() {
+    clearAuth();
+    router.replace("/login");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -112,13 +124,8 @@ export default function Home() {
       return;
     }
 
-    if (!nvmApiKey) {
-      setShowApiKeyInput(true);
-      return;
-    }
-
-    if (!nvmConfig) {
-      setError("Loading payment config... Please try again.");
+    if (!hasNvmKey) {
+      setShowNvmInput(true);
       return;
     }
 
@@ -126,21 +133,11 @@ export default function Home() {
     setError("");
 
     try {
-      const token = await getX402AccessToken(
-        nvmApiKey,
-        nvmConfig.nvmEnvironment,
-        nvmConfig.nvmPlanId,
-        nvmConfig.nvmAgentId,
-      );
-      const result = await createVerification(
-        {
-          question: trimmed,
-          targetLat: 37.7749,
-          targetLng: -122.4194,
-          requesterId,
-        },
-        token,
-      );
+      const result = await createVerification({
+        question: trimmed,
+        targetLat: 37.7749,
+        targetLng: -122.4194,
+      });
       router.push(`/verify/${result.job.id}`);
     } catch (err) {
       if (err instanceof PaymentRequiredError) {
@@ -151,6 +148,14 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!authChecked) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <p className="text-zinc-500">Loading...</p>
+      </main>
+    );
   }
 
   const isValid = question.trim().length > 0 && validateQuestion(question.trim()).valid;
@@ -165,24 +170,28 @@ export default function Home() {
           </p>
         </div>
 
+        {/* Account bar */}
+        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
+          <span className="text-sm text-zinc-400 truncate">{auth?.email}</span>
+          <button
+            onClick={handleSignOut}
+            className="text-xs text-zinc-500 hover:text-red-400 transition-colors ml-3 shrink-0"
+          >
+            Sign out
+          </button>
+        </div>
+
         {/* Nevermined connection status */}
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${nvmApiKey ? "bg-emerald-500" : "bg-zinc-600"}`} />
+            <span className={`h-2 w-2 rounded-full ${hasNvmKey ? "bg-emerald-500" : "bg-zinc-600"}`} />
             <span className="text-sm text-zinc-400">
-              {nvmApiKey ? "Nevermined connected" : "Not connected"}
+              {hasNvmKey ? "Nevermined connected" : "Not connected"}
             </span>
           </div>
-          {nvmApiKey ? (
+          {!hasNvmKey && (
             <button
-              onClick={handleDisconnect}
-              className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
-            >
-              Disconnect
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowApiKeyInput(true)}
+              onClick={() => setShowNvmInput(true)}
               className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
             >
               Connect
@@ -190,8 +199,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* API Key input */}
-        {showApiKeyInput && !nvmApiKey && (
+        {/* NVM API Key input */}
+        {showNvmInput && !hasNvmKey && (
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 space-y-3">
             <p className="text-sm text-zinc-300">
               Enter your Nevermined API key to pay for verifications.
@@ -212,18 +221,18 @@ export default function Home() {
             <div className="flex gap-2">
               <input
                 type="password"
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
+                value={nvmKeyInput}
+                onChange={(e) => setNvmKeyInput(e.target.value)}
                 placeholder="sandbox:eyJ..."
                 className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                onKeyDown={(e) => e.key === "Enter" && handleSaveApiKey()}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveNvmKey()}
               />
               <button
-                onClick={handleSaveApiKey}
-                disabled={!apiKeyInput.trim()}
+                onClick={handleSaveNvmKey}
+                disabled={!nvmKeyInput.trim() || savingNvm}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
               >
-                Save
+                {savingNvm ? "..." : "Save"}
               </button>
             </div>
           </div>
@@ -269,7 +278,7 @@ export default function Home() {
           >
             {loading
               ? "Processing payment..."
-              : !nvmApiKey
+              : !hasNvmKey
                 ? "Connect & Request Verification"
                 : "Request Verification — 1 Credit"}
           </button>

@@ -43,6 +43,7 @@ export interface PlatformConfig {
 
 export interface SabiConfig {
   apiUrl: string;
+  apiKey?: string;
   nvmApiKey?: string;
 }
 

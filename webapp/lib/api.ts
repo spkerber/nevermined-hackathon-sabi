@@ -1,3 +1,5 @@
+import { authHeaders } from "./auth";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
 export class PaymentRequiredError extends Error {
@@ -8,6 +10,12 @@ export class PaymentRequiredError extends Error {
 }
 
 async function handleResponse(res: Response) {
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
+    throw new Error("Unauthorized");
+  }
   if (res.status === 402) {
     const paymentRequired = res.headers.get("payment-required") ?? "";
     throw new PaymentRequiredError(paymentRequired);
@@ -16,20 +24,33 @@ async function handleResponse(res: Response) {
   return res.json();
 }
 
-export async function createVerification(
-  params: {
-    question: string;
-    targetLat: number;
-    targetLng: number;
-    requesterId?: string;
-  },
-  paymentSignature: string,
-) {
+export async function getMe() {
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) return null;
+  return res.json() as Promise<{ userId: string; email: string; hasNvmKey: boolean }>;
+}
+
+export async function saveNvmKey(nvmApiKey: string) {
+  const res = await fetch(`${API_BASE}/api/auth/nvm-key`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ nvmApiKey }),
+  });
+  return handleResponse(res);
+}
+
+export async function createVerification(params: {
+  question: string;
+  targetLat: number;
+  targetLng: number;
+}) {
   const res = await fetch(`${API_BASE}/api/verifications`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "payment-signature": paymentSignature,
+      ...authHeaders(),
     },
     body: JSON.stringify(params),
   });
@@ -38,10 +59,10 @@ export async function createVerification(
 
 export async function listMyVerifications(requesterId: string) {
   const res = await fetch(
-    `${API_BASE}/api/verifications?requesterId=${encodeURIComponent(requesterId)}`
+    `${API_BASE}/api/verifications?requesterId=${encodeURIComponent(requesterId)}`,
+    { headers: authHeaders() },
   );
-  if (!res.ok) throw new Error((await res.json()).error);
-  return res.json() as Promise<{
+  return handleResponse(res) as Promise<{
     jobs: {
       id: string;
       question: string;
@@ -54,13 +75,16 @@ export async function listMyVerifications(requesterId: string) {
 }
 
 export async function getVerificationStatus(jobId: string) {
-  const res = await fetch(`${API_BASE}/api/verifications/${jobId}`);
-  if (!res.ok) throw new Error((await res.json()).error);
-  return res.json();
+  const res = await fetch(`${API_BASE}/api/verifications/${jobId}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
 }
 
 export async function getArtifact(jobId: string) {
-  const res = await fetch(`${API_BASE}/api/verifications/${jobId}/artifact`);
+  const res = await fetch(`${API_BASE}/api/verifications/${jobId}/artifact`, {
+    headers: authHeaders(),
+  });
   return handleResponse(res);
 }
 
@@ -71,15 +95,16 @@ export function getFrameUrl(path: string) {
 export async function archiveVerification(jobId: string) {
   const res = await fetch(`${API_BASE}/api/verifications/${jobId}/archive`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
   });
-  if (!res.ok) throw new Error((await res.json()).error);
-  return res.json();
+  return handleResponse(res);
 }
 
 export function getWebSocketUrl(jobId: string) {
   const wsBase = API_BASE.replace(/^http/, "ws");
-  return `${wsBase}/agents/verification-agent/${jobId}`;
+  const apiKey = typeof window !== "undefined" ? localStorage.getItem("sabi_api_key") : null;
+  const qs = apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : "";
+  return `${wsBase}/agents/verification-agent/${jobId}${qs}`;
 }
 
 export async function getConfig() {

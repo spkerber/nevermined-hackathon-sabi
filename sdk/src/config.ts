@@ -13,6 +13,7 @@ export function loadConfig(): SabiConfig {
     const raw = readFileSync(RC_PATH, "utf-8");
     const file = JSON.parse(raw);
     if (file.apiUrl) config.apiUrl = file.apiUrl;
+    if (file.apiKey) config.apiKey = file.apiKey;
     if (file.nvmApiKey) config.nvmApiKey = file.nvmApiKey;
   } catch {
     // No config file, use defaults
@@ -20,6 +21,7 @@ export function loadConfig(): SabiConfig {
 
   // 2. Env vars override
   if (process.env.SABI_API_URL) config.apiUrl = process.env.SABI_API_URL;
+  if (process.env.SABI_API_KEY) config.apiKey = process.env.SABI_API_KEY;
   if (process.env.SABI_NVM_API_KEY) config.nvmApiKey = process.env.SABI_NVM_API_KEY;
   // Also support NVM_API_KEY for compatibility with the buyer script
   if (process.env.NVM_API_KEY && !config.nvmApiKey) config.nvmApiKey = process.env.NVM_API_KEY;
@@ -56,6 +58,7 @@ export function resetConfig(): void {
 export function resolveConfig(overrides?: Partial<SabiConfig>): SabiConfig {
   const config = loadConfig();
   if (overrides?.apiUrl) config.apiUrl = overrides.apiUrl;
+  if (overrides?.apiKey) config.apiKey = overrides.apiKey;
   if (overrides?.nvmApiKey) config.nvmApiKey = overrides.nvmApiKey;
   return config;
 }
