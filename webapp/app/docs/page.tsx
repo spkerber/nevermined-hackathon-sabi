@@ -96,7 +96,7 @@ export default function DocsPage() {
         <p className="text-zinc-400 text-sm leading-relaxed">
           Point your agent at{" "}
           <a
-            href="https://raw.githubusercontent.com/spkerber/nevermined-hackathon-sabi/main/sdk/skill/SKILL.md"
+            href="/skill"
             className="text-zinc-200 underline underline-offset-2"
           >
             SKILL.md
