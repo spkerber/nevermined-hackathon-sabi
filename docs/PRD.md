@@ -13,6 +13,7 @@ Enable anyone to request verifiable, real-world information -- answered and evid
 ### Background
 
 - Hackathon focus: A2A transactions with payment (x402 / Nevermined).
+- Sabi follows a **mechanical-turk style model**: requesters submit verification tasks; verifiers (human-in-the-loop) see and accept or decline tasks; payment per completed task. We do not use the [Amazon Mechanical Turk](https://www.mturk.com/) API — the product is our own verification marketplace with Meta-glasses-captured evidence.
 - Ray-Ban Meta glasses provide a hands-free camera stream and voice interface, making them ideal for on-the-ground verification.
 - Goal: learn Nevermined end-to-end, ship a working flow, and demonstrate a novel use of wearable hardware for paid verification tasks.
 
@@ -21,11 +22,12 @@ Enable anyone to request verifiable, real-world information -- answered and evid
 - One end-to-end verification: requester submits question -> verifier matched by geolocation -> verifier accepts job -> verification session captures photos + vocal answer -> requester reviews artifact (photos + answer) in webapp.
 - Nevermined payment (x402) is required and used for each verification job.
 - Artifact review webapp allows step-through of captured photos and displays the vocal answer.
+- V1 scope: two verifiers (Ben + Spencer); no open worker signup. "Mechanical turk" is the *model* (request → match → accept/decline → evidence), not scale.
 
 ### Timeline
 
-- V1: Verification flow + Nevermined + geolocation matching + Ray-Ban Meta session capture + artifact review webapp.
-- Post-V1: Reputation/rating system, multi-verifier consensus, richer media (video clips), agent-initiated requests.
+- V1: Verification flow + Nevermined + geolocation matching + Ray-Ban Meta session capture + artifact review webapp; verifier reject and abandon flows; refund policy (Sabi absorbs cost for failed orders).
+- Post-V1: Reputation/rating system, multi-verifier consensus, richer media (video clips), agent-initiated requests, open verifier pool, automated refund flows.
 
 ---
 
@@ -33,7 +35,7 @@ Enable anyone to request verifiable, real-world information -- answered and evid
 
 ### The problem
 
-Remote parties need verifiable, real-world information but have no way to get it with evidence. Examples: "How many Fantas are left in this vending machine?", "Is this storefront open right now?", "What's the current condition of this construction site?" There is no marketplace that matches these requests to nearby humans who can physically verify and provide photographic evidence.
+Remote parties need verifiable, real-world information but have no way to get it with evidence. Examples: "How many Fantas are left in this vending machine?", "Is this storefront open right now?", "What's the current condition of this construction site?" There is no marketplace that matches these requests to nearby humans who can physically verify and provide photographic evidence. The same verification-proof pattern applies to **personal or home** ("Is my garage door closed?") and to **outcome resolution** (e.g. prediction or betting markets such as [Kalshi](https://kalshi.com) or [Polymarket](https://polymarket.com), where photo + answer can serve as evidence for real-world outcome resolution). V1 focuses on venue/event and place-based verification; the product is generic verification-as-a-service.
 
 ### Who has this problem
 
@@ -71,7 +73,7 @@ Remote parties need verifiable, real-world information but have no way to get it
 
 ### Agent users (A2A)
 
-- The "buyer" is the requester's agent or the app acting on their behalf; it pays with Nevermined credits (x402) for the verification service. The "seller" is Sabi's verification service agent that validates payment, matches a verifier, and delivers the artifact.
+Sabi uses **multiple agents** for selling, buying, onboarding, order-help, and turker support. See [§5 Multi-agent architecture](#multi-agent-architecture) for the full set. In the core A2A transaction: the **buyer** (requester's agent or buying agent) pays with Nevermined credits (x402) for verification; the **seller** is Sabi's verification service agent that validates payment, matches a verifier, and delivers the artifact.
 
 ---
 
@@ -92,6 +94,8 @@ Remote parties need verifiable, real-world information but have no way to get it
 - Reputation or rating system for verifiers.
 - Complex routing or global coverage.
 - Scale or productization beyond demo.
+- Open verifier signup or public worker pool (V1: Ben + Spencer only).
+- Automated refund flows (V1: Sabi absorbs cost of failed orders and labor).
 
 ---
 
@@ -104,7 +108,9 @@ Remote parties need verifiable, real-world information but have no way to get it
 - **Backend:** Verification service that (1) accepts paid verification requests, (2) matches to nearby verifiers by geolocation, (3) manages session lifecycle, (4) captures photos from Ray-Ban Meta stream (1 photo / 5 seconds), (5) transcribes vocal answer, (6) assembles and delivers artifact.
 - **Ray-Ban Meta integration via companion app:** A forked version of [VisionClaw](https://github.com/nicholasgoulding/VisionClaw) runs on the verifier's iPhone, paired with their Ray-Ban Metas. When the verifier starts a verification session, the app programmatically captures 1 photo every 5 seconds from the glasses' camera stream and uploads them. Capture stops automatically when the session ends (i.e. the verifier has answered the core question). Transcription of the verifier's vocal answer uses VisionClaw's built-in transcription capabilities.
 - **Artifact:** A bundle containing (1) the original question, (2) the transcribed vocal answer, (3) timestamped photos captured during the session. Reviewable in a webapp as a step-through slideshow with the answer displayed.
-- **Job status lifecycle:** Each verification job has a status visible to the requester: `connecting` (seeking a verifier; stays here if verifiers decline) -> `accepted` (verifier has taken the job) -> `in_progress` (verification session active) -> `verified` (session complete, artifact ready). Requester sees real-time status updates.
+- **Job status lifecycle:** Each verification job has a status visible to the requester: `connecting` (seeking a verifier) -> `rejected` (a verifier explicitly declined; job may be re-offered to next verifier) -> `accepted` (verifier took the job) -> `in_progress` (verification session active) -> `verified` (session complete, artifact ready) or `cancelled` / `abandoned` (verifier ended the job after acceptance but before completion). Requester sees real-time status updates.
+- **Refunds:** When a job is `rejected` (verifier declined before starting) or `cancelled`/`abandoned` (verifier ended after accept, before completion), the requester is refunded. V1: Sabi absorbs the cost of failed orders and labor (no charge to requester; verifier not paid for abandoned jobs). Post-V1: implement Nevermined reversal/refund flows as needed.
+- **Verifier choice:** Verifier can decline a job (with optional reason: e.g. too far, too difficult, can't access, unsafe, or illicit) and can end a job after acceptance but before completion (abandon), with reason; backend sets status and applies refund policy.
 
 ### Key features (V1)
 
@@ -115,17 +121,47 @@ Remote parties need verifiable, real-world information but have no way to get it
 - Voice-initiated verification session on Ray-Ban Metas.
 - Programmatic photo capture: companion app (VisionClaw fork on iPhone) captures 1 photo every 5 seconds from Ray-Ban Meta stream. Starts automatically when session begins, stops when session ends.
 - Vocal answer capture: verifier speaks the answer to the verification question; transcribed using VisionClaw's built-in transcription.
-- Job status lifecycle: `connecting` -> `accepted` -> `in_progress` -> `verified`, visible to requester in real-time.
+- Job status lifecycle: `connecting` -> `rejected` (optional) -> `accepted` -> `in_progress` -> `verified` or `cancelled`/`abandoned`, visible to requester in real-time.
+- Verifier can decline a job with optional reason (e.g. too far, too difficult, can't access, unsafe, illicit); can abandon after accept with reason. Refund to requester; V1 Sabi absorbs cost.
 - Artifact assembly: question + transcribed answer + timestamped photos.
 - Artifact review webapp: step-through photo viewer with answer display.
 - Nevermined payment: flat rate of $5 per verification task. Requester pays upfront; verifier compensated on completion.
+
+### Job eligibility and rejection
+
+- **System-level (optional for V1):** Simple rules can filter jobs before offer: e.g. max distance from verifier, max payout, blocklist of keywords or categories. Jobs that fail eligibility are not offered (or get a "not eligible" state).
+- **Verifier-level:** Verifier can decline or abandon with reason; reasons (e.g. "too far", "illegal") can inform eligibility rules or flagging post-V1.
+- **Content policy:** We do not fulfill requests that are illegal, harmful, or that ask the verifier to do anything dangerous or illicit. Verifiers are encouraged to decline such jobs; Sabi may add keyword/pattern checks and manual review post-V1. Examples of in-scope: "Is my garage door closed?" (with consent); out-of-scope: "Go into a restricted area" (verifier may decline; we may add eligibility so such jobs are not offered).
+
+### Verifier identity (truth providers)
+
+To represent verifiers as accountable truth providers, the **completion/receipt** (email or in-app notification when a verification is delivered) includes the verifier's identity and a way to connect:
+- **LinkedIn profile:** Include the verifier's LinkedIn URL so the requester can see who provided the verification and optionally send a connection request (e.g. "Add us on LinkedIn" CTA). V1 verifiers: [Spencer Kerber](https://www.linkedin.com/in/spencerkerber/), [Ben Imadali](https://www.linkedin.com/in/bimadali/).
+- **Receipt contents:** Job summary, artifact link, verifier name + LinkedIn link, short note inviting the requester to connect. Reinforces that a real human (identifiable, linkable) provided the evidence.
+
+### Multi-agent architecture
+
+We set up **multiple agents** to cover selling, buying, onboarding, order-help, and turker support. Each can be implemented as a distinct agent (e.g. Nevermined-registered, or LangChain/skill) that shares the same backend and auth.
+
+| Agent | Role | Responsibilities |
+|-------|------|------------------|
+| **Seller agent** | Sabi verification-as-a-service | Lists verification as a metered service on the market; validates payment (x402); matches requests to nearby verifiers; delivers artifacts; handles reject/abandon and refund policy. Registers in Nevermined as the seller. |
+| **Buyer agent** | Purchasing verification (data) | Acts on behalf of the requester to buy verification. Submits verification requests with `payment-signature`; can be the webapp, a skill inside a coding agent (Claude/Codex), or a dedicated "buying" agent that helps requesters purchase verification. |
+| **Onboarding agent(s)** | User onboarding | Helps people register as requester or verifier, set location, connect wallet, and understand the flow. Can be conversational (chat) or guided UI. |
+| **Order-help agent** | Helping requesters make an order | Suggests question types and examples (e.g. "Is there food at the lunch counter?", "Is the vending machine working?", "Open chairs in AWS Builders Loft?"); helps formulate the verification question and target location; guides through payment and submission. |
+| **Turker (verifier) agent** | Assisting the human verifier | Surfaces nearby jobs (pay, distance, question summary); helps accept, decline, or abandon with reason; guides the verification session (e.g. go to location, answer vocally, end session). Runs in the verifier companion app or as a voice/skill for the turker. |
+
+- **Seller** and **buyer** agents are required for the A2A payment flow (Nevermined). **Onboarding**, **order-help**, and **turker** agents improve UX and can be phased (e.g. order-help and turker agent in V1; onboarding can start as guided UI).
+- All agents use the same backend APIs and auth; agent-specific logic can live in prompts, skills, or thin wrappers over the REST API.
+
+**Deep agent / orchestration:** The onboarding, order-help, turker (and optionally buyer) agents are good candidates for **deep agents** — i.e. conversational agents with tool use, multi-step reasoning, and API calls. This is where **LangChain** (e.g. LangGraph, agent runtimes) or **Mindra** (as orchestration) can make sense: one orchestration layer runs these agents, each with its own prompt and tools (e.g. "submit verification", "list my jobs", "accept/decline job"), while the **seller** remains the backend service that validates payment and matches verifiers. Choice of LangChain vs Mindra is a build-time decision; both can call the same Sabi REST API.
 
 ### Service access: Skill + API
 
 The verification service is available in two modes:
 
-1. **Skill (for AI coding agents):** Builders using Claude Code, Codex, or similar agents install Sabi as a skill. The agent can then submit verification requests conversationally (e.g. "verify how many Fantas are in the vending machine at 123 Main St").
-2. **API (for applications):** Builders integrating verification into their own code call the Sabi REST API directly.
+1. **Skill (for AI coding agents):** Builders using Claude Code, Codex, or similar agents install Sabi as a skill. The **buyer** or **order-help** agent can then submit verification requests conversationally (e.g. "verify how many Fantas are in the vending machine at 123 Main St").
+2. **API (for applications):** Builders integrating verification into their own code call the Sabi REST API directly. The **buyer agent** or app uses this under the hood.
 
 Both modes use the same backend and the same authentication. Both require Nevermined payment (x402) -- every verification request debits credits before it is created.
 
@@ -145,21 +181,23 @@ Both modes use the same backend and the same authentication. Both require Neverm
 
 - Requester can submit a verification question with a target geolocation.
 - `POST /verifications` requires a Nevermined `payment-signature` (x402). No payment = no verification (402 Payment Required).
-- Requester sees real-time job status: `connecting` (waiting for verifier match; remains here if verifiers decline), `accepted` (verifier took the job), `in_progress` (session active), `verified` (artifact ready).
-- Requester is notified on status transitions (especially `accepted` and `verified`).
+- Requester sees real-time job status: `connecting`, `rejected` (verifier declined; may be re-offered), `accepted`, `in_progress`, `verified` (artifact ready), or `cancelled`/`abandoned` (verifier ended before completion; requester refunded, V1 Sabi absorbs cost).
+- Requester is notified on status transitions (especially `accepted`, `verified`, `rejected`, `cancelled`/`abandoned`).
+- On completion, requester receives a receipt (email or in-app) that includes the verifier's name and LinkedIn profile link, with an optional CTA to connect (truth-provider identity).
 - Requester can review the artifact in a webapp: step-through photo viewer + transcribed answer.
 
 #### Verifier
 
 - Verifier registers in the pool with their current geolocation.
 - Verifier receives job offers for nearby verification requests (question summary, pay, distance).
-- Verifier can accept or decline a job offer.
+- Verifier can accept or decline a job offer. Decline can include an optional reason (e.g. too far, too difficult, can't access, unsafe, illicit).
+- Verifier can end the job after acceptance but before completion (abandon), with optional reason; job status becomes `cancelled`/`abandoned`, requester is refunded, V1 Sabi absorbs cost.
 - On acceptance, verifier receives detailed instructions (full question, target location details).
 - Verifier can start a verification session vocally via Ray-Ban Metas.
 - During an active session, 1 photo is captured every 5 seconds from the Ray-Ban Meta stream and uploaded.
 - Verifier answers the core verification question vocally; the answer is transcribed.
-- Verifier can end the verification session vocally.
-- On session end, the artifact is assembled and delivered to the requester.
+- Verifier can end the verification session vocally (complete) or abandon mid-job (incomplete); on session end or abandon, backend applies status and refund policy.
+- On successful session end, the artifact is assembled and delivered to the requester; receipt includes verifier LinkedIn (truth-provider identity).
 
 #### Matching
 
@@ -177,8 +215,8 @@ Both modes use the same backend and the same authentication. Both require Neverm
 ### Agent / A2A
 
 - Payment validation: require `payment-signature` (x402) for verification request; verify then settle via Nevermined SDK.
-- One "verification service" agent that accepts paid requests, matches verifiers, and delivers artifacts.
-- Service accessible as both an agent skill and a REST API, sharing the same backend and auth.
+- **Multi-agent setup:** Seller agent (Sabi verification service), buyer agent (purchasing verification), onboarding agent(s), order-help agent (suggest question types, help make an order), turker agent (help verifier see jobs, accept/decline/abandon, run session). See [§5 Multi-agent architecture](#multi-agent-architecture).
+- Seller agent accepts paid requests, matches verifiers, delivers artifacts; buyer/order-help agents submit requests; turker agent assists the human verifier. Service accessible as agent skill(s) and REST API, shared backend and auth.
 
 ---
 
@@ -200,9 +238,10 @@ Both modes use the same backend and the same authentication. Both require Neverm
 
 ### Architecture (high-level)
 
-- **Webapp (requester):** Submit verification requests. Review artifacts via step-through photo viewer with transcribed answer. Exact stack TBD.
-- **Verifier companion app (iPhone):** A fork of [VisionClaw](https://github.com/nicholasgoulding/VisionClaw) running on the verifier's iPhone, paired with Ray-Ban Metas. Handles job notifications, accept/decline, session lifecycle, programmatic photo capture (1/5s), and voice transcription. All Ray-Ban Meta interaction flows through this app.
-- **Backend / API:** Verification request handling, Nevermined payment validation (verify + settle), geolocation matching, session lifecycle management, photo storage, voice transcription, artifact assembly. Hosted on AWS or Cloudflare Workers.
+- **Agents:** Seller agent (verification service, Nevermined seller); buyer agent (purchase verification); onboarding agent(s); order-help agent (suggest questions, help make an order); turker agent (verifier-facing: jobs, accept/decline/abandon, session guidance). All call the same backend/API; see [§5 Multi-agent architecture](#multi-agent-architecture).
+- **Webapp (requester):** Submit verification requests (optionally via order-help agent). Review artifacts via step-through photo viewer with transcribed answer. Exact stack TBD.
+- **Verifier companion app (iPhone):** A fork of [VisionClaw](https://github.com/nicholasgoulding/VisionClaw) running on the verifier's iPhone, paired with Ray-Ban Metas. Hosts or integrates the **turker agent** (surfaces jobs, accept/decline/abandon, session flow). Handles job notifications, programmatic photo capture (1/5s), and voice transcription. All Ray-Ban Meta interaction flows through this app.
+- **Backend / API:** Verification request handling, Nevermined payment validation (verify + settle), geolocation matching, session lifecycle management, photo storage, voice transcription, artifact assembly. Used by all agents. Hosted on AWS or Cloudflare Workers.
 - **Ray-Ban Meta integration:** Handled entirely through the VisionClaw fork companion app on iPhone. The app interfaces with Ray-Ban Metas for programmatic photo capture (1/5s) and leverages VisionClaw's built-in transcription for vocal answers. Photos uploaded to cloud storage during session.
 - **Payment:** Nevermined only (required). Register agent + plan in Nevermined App; use payments SDK for verify/settle.
 - **Auth:** OAuth 2.0 Device Authorization Grant. Two roles: requester (submit requests, review artifacts) and verifier (accept jobs, perform verifications).
@@ -216,23 +255,25 @@ Requester -> POST /verifications (question, target_lat, target_lng, payment-sign
 Backend -> verify payment -> find nearby verifiers -> offer job to closest
 ```
 
-#### 2. Job acceptance
+#### 2. Job acceptance or rejection
 
 ```
-Verifier -> POST /jobs/:id/accept
-Backend -> notify requester -> send detailed instructions to verifier
+Verifier -> POST /jobs/:id/accept  OR  POST /jobs/:id/decline (optional reason)
+Backend -> if accept: notify requester, send detailed instructions to verifier
+           if decline: set status rejected, (optional) offer to next verifier; requester refunded, V1 Sabi absorbs cost
 ```
 
-#### 3. Verification session
+#### 3. Verification session (or abandon)
 
 ```
 Verifier -> starts session in companion app (VisionClaw fork)
              Status: connecting -> accepted -> in_progress
 Companion app -> programmatically captures 1 photo every 5 seconds from Ray-Ban Metas -> uploads to backend
 Verifier -> speaks answer to verification question -> transcribed by VisionClaw
-Verifier -> ends session in companion app (answer captured)
-             Status: in_progress -> verified
-Backend -> assemble artifact (question + answer + photos) -> notify requester
+Verifier -> ends session in companion app (answer captured) OR abandons (end without completing)
+             Status: in_progress -> verified  OR  cancelled/abandoned
+Backend -> if verified: assemble artifact, send receipt (with verifier LinkedIn), notify requester
+           if abandoned: set status cancelled/abandoned, refund requester (V1 Sabi absorbs cost)
 ```
 
 #### 4. Artifact review
@@ -250,7 +291,8 @@ Webapp -> step-through photo viewer (prev/next through timestamped photos)
 - **Geolocation:** Browser geolocation API for verifiers; geocoding for target locations.
 - **Cloud storage:** S3 or equivalent for session photos.
 - **Hosting:** AWS or Cloudflare Workers.
-- **Optional (post-V1):** Exa, Apify, LangChain for deeper agent capabilities.
+- **Agent orchestration (optional for V1):** **LangChain** (e.g. LangGraph, agent runtimes) or **Mindra** — for deep agents that run onboarding, order-help, turker, and optionally buyer. These orchestration layers call the Sabi REST API; the seller agent remains the backend service. Choose one for conversational/multi-step agent logic.
+- **Optional (post-V1):** Exa, Apify for search/scraping; evals for agent behavior.
 
 ### Constraints
 
@@ -270,6 +312,8 @@ Webapp -> step-through photo viewer (prev/next through timestamped photos)
 | Voice transcription accuracy | VisionClaw's built-in transcription handles this; allow verifier to review/correct answer before submission if needed. |
 | Geolocation accuracy indoors | V1 at hackathon venue; use coarse matching (same building/floor). |
 | Photo upload bandwidth | 1 photo / 5s is modest; compress images before upload. |
+| Scope creep (fork + matching + refunds) | Strict V1: two verifiers only; defer automated refund flows; Sabi absorbs cost for reject/abandon. |
+| Verifier declines or abandons | Clear statuses and refund policy; V1 we absorb cost; document in receipt/UX. |
 
 ---
 
@@ -280,6 +324,8 @@ Webapp -> step-through photo viewer (prev/next through timestamped photos)
 - How to handle verifier availability/status (online/offline, busy/free).
 - VisionClaw fork scope: what modifications are needed beyond adding Sabi job management and programmatic photo timer?
 - How to trigger session start/end: voice command via Ray-Ban Metas, button in companion app, or both?
+- **Agent phasing for V1:** Seller + buyer agents are required for A2A. Should order-help and turker agents be full conversational agents in V1, or start as guided UI / minimal prompts and evolve post-demo?
+- **Orchestration choice:** For deep agents (onboarding, order-help, turker, buyer), use **LangChain** (e.g. LangGraph) or **Mindra**? Both can orchestrate multi-step, tool-calling agents against the same Sabi API; decision depends on team familiarity and hackathon constraints.
 
 ---
 
@@ -292,13 +338,33 @@ Webapp -> step-through photo viewer (prev/next through timestamped photos)
 - [nevermined-io/hackathons -- seller-simple-agent](https://github.com/nevermined-io/hackathons/tree/main/agents/seller-simple-agent).
 - [VisionClaw](https://github.com/nicholasgoulding/VisionClaw) -- iPhone app for Ray-Ban Meta integration (fork base).
 - [Ray-Ban Meta developer docs](https://www.meta.com/smart-glasses/) -- hardware reference.
+- [Amazon Mechanical Turk](https://www.mturk.com/) -- crowdsourcing model reference (Sabi uses the same paradigm; we do not use the MTurk API).
+- **LangChain / LangGraph** -- option for deep-agent orchestration (multi-step, tool-calling agents). [LangChain](https://www.langchain.com/), [LangGraph](https://langchain-ai.github.io/langgraph/).
+- **Mindra** -- option for agent orchestration; can run onboarding, order-help, turker, buyer agents against Sabi API. (Hackathon / team docs for Mindra integration TBD.)
+
+### Use case spectrum
+
+- **Venue / event:** "How many Fantas in the vending machine?", "Are there open chairs in the AWS Builders Loft?" (V1 focus).
+- **Retail / place:** "Is this storefront open?", "Condition of this construction site?"
+- **Personal / home:** "Is my garage door closed?" (with appropriate consent and safety).
+- **Markets / resolution:** Verification proof for prediction or betting markets (e.g. [Kalshi](https://kalshi.com), [Polymarket](https://polymarket.com)) — photo + answer as evidence for outcome resolution; V1 is generic verification, not custom market integration.
 
 ### Glossary
 
 - **A2A:** Agent-to-agent (transaction or communication).
 - **x402:** HTTP payment protocol used by Nevermined (402 Payment Required, payment-signature header).
+- **Seller agent:** Sabi's verification-as-a-service agent; validates payment, matches verifiers, delivers artifacts; Nevermined seller.
+- **Buyer agent:** Agent that purchases verification on behalf of the requester; submits requests with payment-signature.
+- **Onboarding agent:** Helps users register (requester/verifier), set location, connect wallet.
+- **Order-help agent:** Suggests question types and helps requesters formulate and submit verification orders.
+- **Turker agent:** Assists the human verifier (surfaces jobs, accept/decline/abandon, session guidance); runs in companion app or as voice/skill.
+- **Deep agent:** A conversational agent with tool use and multi-step reasoning; often implemented with LangChain or Mindra orchestration, calling backend APIs.
+- **Orchestration:** The layer (e.g. LangChain, Mindra) that runs one or more deep agents, each with prompts and tools; here, onboarding, order-help, turker, and optionally buyer agents.
 - **Verifier:** A person with Ray-Ban Meta glasses who performs on-the-ground verification tasks.
 - **Requester:** A person or agent who submits a verification question and pays for the service.
 - **Artifact:** The deliverable for a verification job: original question + transcribed answer + timestamped photos.
 - **Verification session:** The active period during which the verifier's Ray-Ban Metas capture photos and the verifier answers the question vocally.
 - **Credits:** Nevermined plan credits consumed per verification job.
+- **Reject:** Verifier declines the job before starting (optional reason); requester refunded.
+- **Abandon / Cancel:** Verifier ends the job after acceptance but before completion; requester refunded; V1 Sabi absorbs cost.
+- **Refund:** Requester credited back when job is rejected or abandoned; V1 handled by Sabi absorbing cost (no Nevermined reversal required for demo).
