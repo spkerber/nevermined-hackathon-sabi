@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createVerification, listMyVerifications, getMe, saveNvmAgentId, getConfig, PaymentRequiredError } from "@/lib/api";
+import { createVerification, listMyVerifications, getMe, getConfig, PaymentRequiredError } from "@/lib/api";
 import { validateQuestion } from "@/lib/validate-question";
 import { getNvmAppUrl } from "@/lib/nevermined";
 import { getAuth, clearAuth, type AuthState } from "@/lib/auth";
@@ -29,7 +29,6 @@ export default function Home() {
   const router = useRouter();
   const [auth, setAuthState] = useState<AuthState | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [hasNvmAgentId, setHasNvmAgentId] = useState(false);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -37,10 +36,14 @@ export default function Home() {
   const [suggestion, setSuggestion] = useState("");
   const [myJobs, setMyJobs] = useState<MyJob[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
-  const [showNvmInput, setShowNvmInput] = useState(false);
-  const [nvmAgentIdInput, setNvmAgentIdInput] = useState("");
-  const [savingNvm, setSavingNvm] = useState(false);
   const [nvmConfig, setNvmConfig] = useState<{ nvmEnvironment: string } | null>(null);
+
+  // Payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState("");
+  const [accessTokenInput, setAccessTokenInput] = useState("");
+  const [paymentInfo, setPaymentInfo] = useState<Record<string, unknown> | null>(null);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
 
   // Check auth on mount
   useEffect(() => {
@@ -51,9 +54,7 @@ export default function Home() {
     }
     setAuthState(current);
 
-    // Fetch server-side NVM key status
-    getMe().then((me) => {
-      if (me) setHasNvmAgentId(me.hasNvmAgentId);
+    getMe().then(() => {
       setAuthChecked(true);
     }).catch(() => setAuthChecked(true));
 
@@ -92,22 +93,6 @@ export default function Home() {
     }
   }, [question]);
 
-  async function handleSaveNvmAgentId() {
-    const id = nvmAgentIdInput.trim();
-    if (!id) return;
-    setSavingNvm(true);
-    try {
-      await saveNvmAgentId(id);
-      setHasNvmAgentId(true);
-      setShowNvmInput(false);
-      setNvmAgentIdInput("");
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSavingNvm(false);
-    }
-  }
-
   function handleSignOut() {
     clearAuth();
     router.replace("/login");
@@ -124,11 +109,6 @@ export default function Home() {
       return;
     }
 
-    if (!hasNvmAgentId) {
-      setShowNvmInput(true);
-      return;
-    }
-
     setLoading(true);
     setError("");
 
@@ -141,12 +121,38 @@ export default function Home() {
       router.push(`/verify/${result.job.id}`);
     } catch (err) {
       if (err instanceof PaymentRequiredError) {
-        setError("Insufficient credits. Please purchase credits on Nevermined first.");
+        setPendingQuestion(trimmed);
+        setPaymentInfo(err.paymentInfo ?? null);
+        setShowPaymentModal(true);
       } else {
         setError((err as Error).message);
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handlePayAndSubmit() {
+    const token = accessTokenInput.trim();
+    if (!token) return;
+
+    setSubmittingPayment(true);
+    setError("");
+
+    try {
+      const result = await createVerification({
+        question: pendingQuestion,
+        targetLat: 37.7749,
+        targetLng: -122.4194,
+        accessToken: token,
+      });
+      setShowPaymentModal(false);
+      setAccessTokenInput("");
+      router.push(`/verify/${result.job.id}`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmittingPayment(false);
     }
   }
 
@@ -159,6 +165,11 @@ export default function Home() {
   }
 
   const isValid = question.trim().length > 0 && validateQuestion(question.trim()).valid;
+
+  // Extract plan info from payment-required header
+  const accepts = paymentInfo ? (paymentInfo as { accepts?: { planId?: string; extra?: { agentId?: string } }[] }).accepts : null;
+  const planId = accepts?.[0]?.planId;
+  const agentId = accepts?.[0]?.extra?.agentId;
 
   return (
     <main className="flex min-h-screen flex-col items-center p-6">
@@ -180,63 +191,6 @@ export default function Home() {
             Sign out
           </button>
         </div>
-
-        {/* Nevermined connection status */}
-        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${hasNvmAgentId ? "bg-emerald-500" : "bg-zinc-600"}`} />
-            <span className="text-sm text-zinc-400">
-              {hasNvmAgentId ? "Nevermined connected" : "Not connected"}
-            </span>
-          </div>
-          {!hasNvmAgentId && (
-            <button
-              onClick={() => setShowNvmInput(true)}
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              Connect
-            </button>
-          )}
-        </div>
-
-        {/* NVM Agent ID input */}
-        {showNvmInput && !hasNvmAgentId && (
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 space-y-3">
-            <p className="text-sm text-zinc-300">
-              Enter your Nevermined Agent ID to pay for verifications.
-              {nvmConfig && (
-                <>
-                  {" "}
-                  <a
-                    href={getNvmAppUrl(nvmConfig.nvmEnvironment)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-indigo-400 hover:text-indigo-300 underline"
-                  >
-                    Get one here
-                  </a>
-                </>
-              )}
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={nvmAgentIdInput}
-                onChange={(e) => setNvmAgentIdInput(e.target.value)}
-                placeholder="agent_..."
-                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                onKeyDown={(e) => e.key === "Enter" && handleSaveNvmAgentId()}
-              />
-              <button
-                onClick={handleSaveNvmAgentId}
-                disabled={!nvmAgentIdInput.trim() || savingNvm}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-              >
-                {savingNvm ? "..." : "Save"}
-              </button>
-            </div>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -267,7 +221,7 @@ export default function Home() {
             )}
           </div>
 
-          {error && (
+          {error && !showPaymentModal && (
             <p className="text-red-400 text-sm">{error}</p>
           )}
 
@@ -276,17 +230,71 @@ export default function Home() {
             disabled={loading || !isValid}
             className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading
-              ? "Processing payment..."
-              : !hasNvmAgentId
-                ? "Connect & Request Verification"
-                : "Request Verification — 1 Credit"}
+            {loading ? "Processing..." : "Request Verification \u2014 1 Credit"}
           </button>
         </form>
 
         <p className="text-center text-xs text-zinc-500">
           A nearby verifier with Ray-Ban Metas will go check and send you photo evidence + a vocal answer.
         </p>
+
+        {/* Payment Modal */}
+        {showPaymentModal && (
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-zinc-200">Payment Required</h3>
+              <p className="text-sm text-zinc-400">
+                This verification costs 1 credit. Obtain an access token from Nevermined, then paste it below.
+              </p>
+              {nvmConfig && (
+                <a
+                  href={getNvmAppUrl(nvmConfig.nvmEnvironment)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-sm text-indigo-400 hover:text-indigo-300 underline"
+                >
+                  Open Nevermined App
+                </a>
+              )}
+            </div>
+
+            {(planId || agentId) && (
+              <div className="text-xs text-zinc-500 space-y-1 bg-zinc-800/50 rounded p-3">
+                {planId && <p>Plan ID: <span className="text-zinc-300 font-mono">{planId}</span></p>}
+                {agentId && <p>Agent ID: <span className="text-zinc-300 font-mono">{agentId}</span></p>}
+              </div>
+            )}
+
+            <input
+              type="text"
+              value={accessTokenInput}
+              onChange={(e) => setAccessTokenInput(e.target.value)}
+              placeholder="Paste access token here..."
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onKeyDown={(e) => e.key === "Enter" && handlePayAndSubmit()}
+            />
+
+            {error && (
+              <p className="text-red-400 text-sm">{error}</p>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowPaymentModal(false); setError(""); }}
+                className="flex-1 rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePayAndSubmit}
+                disabled={!accessTokenInput.trim() || submittingPayment}
+                className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+              >
+                {submittingPayment ? "Submitting..." : "Pay & Submit"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* My Verifications */}
         <div className="space-y-4 pt-4 border-t border-zinc-800">

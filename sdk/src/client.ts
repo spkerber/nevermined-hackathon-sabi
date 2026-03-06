@@ -74,6 +74,19 @@ export class SabiClient {
     const headers = { ...this.authHeaders, ...init?.headers };
     const res = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
 
+    if (res.status === 402) {
+      const paymentHeader = res.headers.get("payment-required");
+      let paymentInfo: Record<string, unknown> | undefined;
+      if (paymentHeader) {
+        try {
+          paymentInfo = JSON.parse(atob(paymentHeader));
+        } catch {
+          // ignore decode errors
+        }
+      }
+      throw new PaymentRequiredError(undefined, paymentInfo);
+    }
+
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as Record<string, string>;
       throw new ApiError(res.status, body.error ?? `Request failed`);
@@ -88,22 +101,26 @@ export class SabiClient {
     return this.platformConfig;
   }
 
-  async signup(nvmAgentId: string): Promise<{ apiKey: string; userId: string }> {
+  async signup(): Promise<{ apiKey: string; userId: string }> {
     return this.request("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nvmAgentId }),
+      body: JSON.stringify({}),
     });
   }
 
   async createVerification(
     params: CreateVerificationParams,
   ): Promise<CreateVerificationResult> {
-    // Payment is resolved server-side from the stored NVM key
+    const { accessToken, ...body } = params;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (accessToken) {
+      headers["payment-signature"] = accessToken;
+    }
     return this.request("/api/verifications", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
+      headers,
+      body: JSON.stringify(body),
     });
   }
 

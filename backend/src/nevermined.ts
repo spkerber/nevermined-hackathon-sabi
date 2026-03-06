@@ -103,36 +103,6 @@ export async function verifyPayment(
   return res.json() as Promise<VerifyResult>;
 }
 
-export async function getX402AccessToken(
-  env: Env,
-  buyerAgentId: string,
-): Promise<string> {
-  const backend = getBackend(env);
-  const res = await fetch(`${backend}/api/v1/x402/permissions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.NVM_API_KEY}`,
-    },
-    body: JSON.stringify({
-      accepted: {
-        scheme: "nvm:erc4337",
-        network: "eip155:84532",
-        planId: env.NVM_PLAN_ID,
-        extra: { agentId: buyerAgentId },
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as Record<string, string>;
-    throw new Error(err.message ?? `Token request failed: HTTP ${res.status}`);
-  }
-
-  const data = await res.json() as { accessToken: string };
-  return data.accessToken;
-}
-
 export async function settlePayment(
   env: Env,
   accessToken: string,

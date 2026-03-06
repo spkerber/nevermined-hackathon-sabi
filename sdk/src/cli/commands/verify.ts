@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { SabiClient } from "../../client.js";
+import { PaymentRequiredError } from "../../errors.js";
 
 export const verifyCmd = new Command("verify")
   .description("Create a new verification job")
@@ -9,6 +10,7 @@ export const verifyCmd = new Command("verify")
   .option("--category <string>", "Job category")
   .option("--requester-id <string>", "Requester ID")
   .option("--payout <number>", "Verifier payout amount", parseFloat)
+  .option("--access-token <string>", "x402 payment access token")
   .option("--watch", "Watch for real-time updates after creation")
   .option("--api-url <string>", "Override API base URL")
   .action(async (question: string, opts) => {
@@ -23,6 +25,7 @@ export const verifyCmd = new Command("verify")
         category: opts.category,
         requesterId: opts.requesterId,
         payout: opts.payout,
+        accessToken: opts.accessToken,
       });
 
       console.log();
@@ -56,6 +59,18 @@ export const verifyCmd = new Command("verify")
         });
       }
     } catch (err) {
+      if (err instanceof PaymentRequiredError) {
+        console.error("\n  Payment required.");
+        if (err.paymentInfo) {
+          const accepts = (err.paymentInfo as { accepts?: { planId?: string; extra?: { agentId?: string } }[] }).accepts;
+          if (accepts?.[0]) {
+            console.error(`  Plan ID:    ${accepts[0].planId}`);
+            console.error(`  Agent ID:   ${accepts[0].extra?.agentId}`);
+          }
+        }
+        console.error("\n  Obtain an x402 access token from Nevermined and pass it via --access-token.\n");
+        process.exit(1);
+      }
       console.error(`Error: ${(err as Error).message}`);
       process.exit(1);
     }

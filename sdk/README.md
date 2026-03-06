@@ -19,13 +19,14 @@ The full API is three calls:
 # 1. Sign up (once)
 curl -X POST https://sabi-backend.ben-imadali.workers.dev/api/auth/signup \
   -H "Content-Type: application/json" \
-  -d '{"nvmAgentId": "my-agent"}'
+  -d '{}'
 # Returns: {"apiKey": "sabi_sk_...", "userId": "..."}
 
-# 2. Submit a verification
+# 2. Submit a verification (requires x402 payment token)
 curl -X POST https://sabi-backend.ben-imadali.workers.dev/api/verifications \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sabi_sk_..." \
+  -H "payment-signature: <access-token>" \
   -d '{"question": "Is the coffee shop open?", "targetLat": 37.78, "targetLng": -122.41}'
 # Returns: {"job": {"id": "...", "status": "connecting", ...}}
 
@@ -41,8 +42,8 @@ All endpoints require `Authorization: Bearer <apiKey>` except signup.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/auth/signup` | Create account. Body: `{"nvmAgentId": "..."}` |
-| `POST` | `/api/verifications` | Submit verification. Body: `{"question", "targetLat", "targetLng"}` |
+| `POST` | `/api/auth/signup` | Create account. Body: `{}` |
+| `POST` | `/api/verifications` | Submit verification. Body: `{"question", "targetLat", "targetLng"}`. Requires `payment-signature` header. |
 | `GET` | `/api/verifications` | List your jobs |
 | `GET` | `/api/verifications/:id` | Job status |
 | `GET` | `/api/verifications/:id/artifact` | Completed result (answer + photo URLs) |

@@ -3,7 +3,7 @@ import { loadConfig, saveConfig, resetConfig } from "../../config.js";
 
 export const configCmd = new Command("config")
   .description("Get or set Sabi CLI configuration")
-  .argument("[key]", "Config key (apiUrl, nvmAgentId)")
+  .argument("[key]", "Config key (apiUrl)")
   .argument("[value]", "Value to set")
   .option("--reset", "Reset config to defaults")
   .action((key?: string, value?: string, opts?: { reset?: boolean }) => {
@@ -17,19 +17,18 @@ export const configCmd = new Command("config")
       if (!key) {
         const config = loadConfig();
         console.log();
-        console.log(`  apiUrl:      ${config.apiUrl}`);
-        console.log(`  nvmAgentId:  ${config.nvmAgentId ?? "(not set)"}`);
+        console.log(`  apiUrl:  ${config.apiUrl}`);
         console.log();
         console.log("  Set with: sabi config <key> <value>");
-        console.log("  Keys: apiUrl, nvmAgentId");
-        console.log("  Env vars: SABI_API_URL, SABI_API_KEY, SABI_NVM_AGENT_ID");
+        console.log("  Keys: apiUrl");
+        console.log("  Env vars: SABI_API_URL, SABI_API_KEY");
         console.log();
         return;
       }
 
       if (key && !value) {
         const config = loadConfig();
-        const val = (config as Record<string, string | undefined>)[key];
+        const val = (config as unknown as Record<string, string | undefined>)[key];
         if (val !== undefined) {
           console.log(`\n  ${key}: ${key === "apiKey" ? val.slice(0, 8) + "..." : val}\n`);
         } else {
@@ -38,11 +37,11 @@ export const configCmd = new Command("config")
         return;
       }
 
-      if (key === "apiUrl" || key === "nvmAgentId") {
+      if (key === "apiUrl") {
         saveConfig({ [key]: value });
         console.log(`\n  ${key} saved.\n`);
       } else {
-        console.error(`\n  Unknown key: ${key}. Valid keys: apiUrl, nvmAgentId\n`);
+        console.error(`\n  Unknown key: ${key}. Valid keys: apiUrl\n`);
         process.exit(1);
       }
     } catch (err) {

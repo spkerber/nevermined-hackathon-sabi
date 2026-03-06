@@ -14,7 +14,6 @@ export function loadConfig(): SabiConfig {
     const file = JSON.parse(raw);
     if (file.apiUrl) config.apiUrl = file.apiUrl;
     if (file.apiKey) config.apiKey = file.apiKey;
-    if (file.nvmAgentId) config.nvmAgentId = file.nvmAgentId;
   } catch {
     // No config file, use defaults
   }
@@ -22,7 +21,6 @@ export function loadConfig(): SabiConfig {
   // 2. Env vars override
   if (process.env.SABI_API_URL) config.apiUrl = process.env.SABI_API_URL;
   if (process.env.SABI_API_KEY) config.apiKey = process.env.SABI_API_KEY;
-  if (process.env.SABI_NVM_AGENT_ID) config.nvmAgentId = process.env.SABI_NVM_AGENT_ID;
 
   return config;
 }
@@ -57,6 +55,5 @@ export function resolveConfig(overrides?: Partial<SabiConfig>): SabiConfig {
   const config = loadConfig();
   if (overrides?.apiUrl) config.apiUrl = overrides.apiUrl;
   if (overrides?.apiKey) config.apiKey = overrides.apiKey;
-  if (overrides?.nvmAgentId) config.nvmAgentId = overrides.nvmAgentId;
   return config;
 }

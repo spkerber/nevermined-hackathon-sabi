@@ -3,9 +3,18 @@ import { authHeaders } from "./auth";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
 export class PaymentRequiredError extends Error {
-  constructor(public paymentRequired: string) {
+  public paymentInfo?: Record<string, unknown>;
+
+  constructor(paymentRequired: string) {
     super("Payment Required");
     this.name = "PaymentRequiredError";
+    if (paymentRequired) {
+      try {
+        this.paymentInfo = JSON.parse(atob(paymentRequired));
+      } catch {
+        // ignore decode errors
+      }
+    }
   }
 }
 
@@ -29,30 +38,27 @@ export async function getMe() {
     headers: authHeaders(),
   });
   if (!res.ok) return null;
-  return res.json() as Promise<{ userId: string; email: string; hasNvmAgentId: boolean }>;
-}
-
-export async function saveNvmAgentId(nvmAgentId: string) {
-  const res = await fetch(`${API_BASE}/api/auth/nvm-agent-id`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ nvmAgentId }),
-  });
-  return handleResponse(res);
+  return res.json() as Promise<{ userId: string; email: string }>;
 }
 
 export async function createVerification(params: {
   question: string;
   targetLat: number;
   targetLng: number;
+  accessToken?: string;
 }) {
+  const { accessToken, ...body } = params;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...authHeaders(),
+  };
+  if (accessToken) {
+    headers["payment-signature"] = accessToken;
+  }
   const res = await fetch(`${API_BASE}/api/verifications`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: JSON.stringify(params),
+    headers,
+    body: JSON.stringify(body),
   });
   return handleResponse(res);
 }
@@ -114,6 +120,5 @@ export async function getConfig() {
     apiBaseUrl: string;
     nvmEnvironment: string;
     nvmPlanId: string;
-    nvmAgentId: string;
   }>;
 }

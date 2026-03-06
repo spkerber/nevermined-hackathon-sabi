@@ -38,13 +38,11 @@ export interface PlatformConfig {
   apiBaseUrl: string;
   nvmEnvironment: string;
   nvmPlanId: string;
-  nvmAgentId: string;
 }
 
 export interface SabiConfig {
   apiUrl: string;
   apiKey?: string;
-  nvmAgentId?: string;
 }
 
 export interface CreateVerificationParams {
@@ -54,6 +52,7 @@ export interface CreateVerificationParams {
   category?: string;
   requesterId?: string;
   payout?: number;
+  accessToken?: string;
 }
 
 export interface CreateVerificationResult {

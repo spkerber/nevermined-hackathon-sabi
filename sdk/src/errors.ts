@@ -16,9 +16,15 @@ export class ApiError extends SabiError {
 }
 
 export class PaymentRequiredError extends SabiError {
-  constructor(message = "Payment required. Set your Nevermined Agent ID via: sabi config nvmAgentId <id>") {
+  public readonly paymentInfo?: Record<string, unknown>;
+
+  constructor(
+    message = "Payment required. Obtain an x402 access token and pass it via accessToken param.",
+    paymentInfo?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "PaymentRequiredError";
+    this.paymentInfo = paymentInfo;
   }
 }
 

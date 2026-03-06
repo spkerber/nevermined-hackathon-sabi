@@ -42,7 +42,7 @@ export default function DocsPage() {
         <pre className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-sm overflow-x-auto">
           <code>{`curl -X POST ${API_BASE}/api/auth/signup \\
   -H "Content-Type: application/json" \\
-  -d '{"nvmAgentId": "my-agent"}'
+  -d '{}'
 
 # => {"apiKey": "sabi_sk_...", "userId": "..."}`}</code>
         </pre>
@@ -57,9 +57,22 @@ export default function DocsPage() {
           2. Submit a verification
         </h2>
         <pre className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-sm overflow-x-auto">
-          <code>{`curl -X POST ${API_BASE}/api/verifications \\
+          <code>{`# First call without payment token to get 402 + payment info:
+curl -X POST ${API_BASE}/api/verifications \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <apiKey>" \\
+  -d '{
+    "question": "Is Blue Bottle on Market St open?",
+    "targetLat": 37.7830,
+    "targetLng": -122.4075
+  }'
+# => HTTP 402, payment-required header (base64 JSON with planId/agentId)
+
+# Then retry with x402 access token from Nevermined:
+curl -X POST ${API_BASE}/api/verifications \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer <apiKey>" \\
+  -H "payment-signature: <access-token>" \\
   -d '{
     "question": "Is Blue Bottle on Market St open?",
     "targetLat": 37.7830,
@@ -69,7 +82,10 @@ export default function DocsPage() {
 # => {"job": {"id": "...", "status": "connecting"}}`}</code>
         </pre>
         <p className="text-zinc-500 text-sm mt-2">
-          A verifier is dispatched immediately.
+          Payment uses the x402 protocol. The 402 response includes a{" "}
+          <code className="text-zinc-300">payment-required</code> header with plan
+          details. Obtain an access token from Nevermined and send it via{" "}
+          <code className="text-zinc-300">payment-signature</code> header.
         </p>
       </section>
 
@@ -148,7 +164,7 @@ export default function DocsPage() {
               <tr className="border-b border-zinc-800/50">
                 <td className="px-4 py-2 text-zinc-300">POST</td>
                 <td className="px-4 py-2">/api/verifications</td>
-                <td className="px-4 py-2">Submit verification</td>
+                <td className="px-4 py-2">Submit verification (requires payment-signature header)</td>
               </tr>
               <tr className="border-b border-zinc-800/50">
                 <td className="px-4 py-2 text-zinc-300">GET</td>

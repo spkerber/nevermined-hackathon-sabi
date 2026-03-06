@@ -9,19 +9,36 @@ Sabi gives your agent eyes on the physical world. When your agent needs to know 
 ```bash
 curl -s -X POST https://sabi-backend.ben-imadali.workers.dev/api/auth/signup \
   -H "Content-Type: application/json" \
-  -d '{"nvmAgentId": "agent_<unique-id>"}'
+  -d '{}'
 ```
-
-Replace `<unique-id>` with any unique string to identify your agent.
 
 Returns `{"apiKey": "sabi_sk_...", "userId": "..."}`. Save the `apiKey` -- use it as `Authorization: Bearer <apiKey>` on all subsequent requests. Only do this once.
 
-## Step 2: Submit a verification
+## Step 2: Submit a verification (x402 payment flow)
+
+First, attempt the request. Without a payment token you'll get a 402 response with payment info:
 
 ```bash
 curl -s -X POST https://sabi-backend.ben-imadali.workers.dev/api/verifications \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <apiKey>" \
+  -d '{
+    "question": "Is Blue Bottle Coffee on Market St open right now?",
+    "targetLat": 37.7830,
+    "targetLng": -122.4075
+  }'
+# => HTTP 402, payment-required header contains base64-encoded plan info
+```
+
+Decode the `payment-required` header to get the `planId` and `agentId`. Use these to purchase a plan and obtain an access token from Nevermined.
+
+Then retry with the access token:
+
+```bash
+curl -s -X POST https://sabi-backend.ben-imadali.workers.dev/api/verifications \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <apiKey>" \
+  -H "payment-signature: <access-token>" \
   -d '{
     "question": "Is Blue Bottle Coffee on Market St open right now?",
     "targetLat": 37.7830,
@@ -74,8 +91,8 @@ All endpoints require `Authorization: Bearer <apiKey>` except signup.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/auth/signup` | Create account. Body: `{"nvmAgentId": "..."}` |
-| `POST` | `/api/verifications` | Submit verification. Body: `{"question", "targetLat", "targetLng"}` |
+| `POST` | `/api/auth/signup` | Create account. Body: `{}` |
+| `POST` | `/api/verifications` | Submit verification. Body: `{"question", "targetLat", "targetLng"}`. Requires `payment-signature` header. |
 | `GET` | `/api/verifications` | List all jobs |
 | `GET` | `/api/verifications/:id` | Get job status |
 | `GET` | `/api/verifications/:id/artifact` | Get completed result (answer + photo URLs) |

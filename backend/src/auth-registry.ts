@@ -7,7 +7,6 @@ export interface Account {
   email: string;
   passwordHash: string | null;
   apiKey: string;
-  nvmAgentId: string | null;
   createdAt: number;
 }
 
@@ -38,7 +37,6 @@ export class AuthRegistry extends DurableObject<Env> {
     email: string;
     passwordHash: string | null;
     apiKey: string;
-    nvmAgentId?: string;
   }): Promise<Account> {
     await this.ensureLoaded();
 
@@ -52,7 +50,6 @@ export class AuthRegistry extends DurableObject<Env> {
       email: params.email,
       passwordHash: params.passwordHash,
       apiKey: params.apiKey,
-      nvmAgentId: params.nvmAgentId ?? null,
       createdAt: Date.now(),
     };
 
@@ -77,20 +74,6 @@ export class AuthRegistry extends DurableObject<Env> {
     const account = this.accounts.get(id);
     if (!account) return null;
     return { id: account.id, email: account.email };
-  }
-
-  async setNvmAgentId(accountId: string, nvmAgentId: string): Promise<void> {
-    await this.ensureLoaded();
-    const account = this.accounts.get(accountId);
-    if (!account) throw new Error("Account not found");
-    account.nvmAgentId = nvmAgentId;
-    await this.save();
-  }
-
-  async getNvmAgentId(accountId: string): Promise<string | null> {
-    await this.ensureLoaded();
-    const account = this.accounts.get(accountId);
-    return account?.nvmAgentId ?? null;
   }
 
   async getFullAccount(apiKey: string): Promise<Account | null> {
