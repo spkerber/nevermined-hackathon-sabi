@@ -1,6 +1,6 @@
 # Sabi design tokens (A11y)
 
-Design system inspired by the [Berkeley Mono](https://usgraphics.com/products/berkeley-mono) product page: technical, control-panel aesthetic, monospace-forward. Uses **free** fonts (IBM Plex) and a dark theme with WCAG 2.1 AA–compliant contrast.
+Design system inspired by the [Berkeley Mono](https://usgraphics.com/products/berkeley-mono) product page: technical, control-panel aesthetic, monospace-forward. Uses **free** fonts (IBM Plex) and light/dark themes with WCAG 2.1 AA–compliant contrast.
 
 ## Fonts
 
@@ -9,9 +9,33 @@ Design system inspired by the [Berkeley Mono](https://usgraphics.com/products/be
 | Sans   | IBM Plex Sans  | UI, labels, body text  |
 | Mono   | IBM Plex Mono  | Code, IDs, data, docs  |
 
-## Color tokens (dark theme)
+## Themes
+
+- **Light (default):** `data-theme="light"` or no attribute on `<html>`
+- **Dark:** `data-theme="dark"`
+- **Toggle:** Theme is persisted in `localStorage` under `sabi-theme`. A floating toggle (top-right) switches between light and dark.
+
+## Color tokens
 
 All foreground colors meet **4.5:1** contrast on their background (WCAG AA normal text). Large text meets 3:1 where used.
+
+### Light theme (default)
+
+| Token           | Hex       | Use |
+|-----------------|-----------|-----|
+| `--sabi-bg`     | `#fafafa` | Page background |
+| `--sabi-surface`| `#ffffff` | Cards, inputs, panels |
+| `--sabi-border` | `#e5e5e5` | Borders, dividers |
+| `--sabi-text`   | `#0a0a0a` | Primary text |
+| `--sabi-muted`  | `#525252` | Secondary text |
+| `--sabi-accent` | `#4f6bed` | Links, primary actions |
+| `--sabi-accent-hover` | `#3b5bdb` | Hover state |
+| `--sabi-success`| `#16a34a` | Verified, success |
+| `--sabi-warning`| `#ca8a04` | Waiting, caution |
+| `--sabi-error`  | `#dc2626` | Errors, destructive |
+| `--sabi-focus`  | `#4f6bed` | Focus ring (2px) |
+
+### Dark theme
 
 | Token           | Hex       | Use |
 |-----------------|-----------|-----|

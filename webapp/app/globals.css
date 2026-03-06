@@ -1,7 +1,25 @@
 @import "tailwindcss";
 
 /* Sabi design tokens — Berkeley Mono–inspired, A11y (WCAG 2.1 AA) */
-:root {
+/* Light theme (default) */
+:root,
+[data-theme="light"] {
+  --sabi-bg: #fafafa;
+  --sabi-surface: #ffffff;
+  --sabi-border: #e5e5e5;
+  --sabi-text: #0a0a0a;
+  --sabi-muted: #525252;
+  --sabi-accent: #4f6bed;
+  --sabi-accent-hover: #3b5bdb;
+  --sabi-success: #16a34a;
+  --sabi-warning: #ca8a04;
+  --sabi-error: #dc2626;
+  --sabi-focus: #4f6bed;
+  --sabi-inprogress: #2563eb;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
   --sabi-bg: #0a0a0a;
   --sabi-surface: #141414;
   --sabi-border: #262626;
