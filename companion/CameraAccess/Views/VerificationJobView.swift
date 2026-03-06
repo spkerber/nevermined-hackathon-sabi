@@ -84,7 +84,7 @@ struct VerificationJobView: View {
       locationManager.requestPermission()
       await loadJobs()
     }
-    .onChange(of: selectedTab) { _ in
+    .onChange(of: selectedTab) {
       Task {
         await loadCurrentTab()
       }
