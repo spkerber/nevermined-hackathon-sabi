@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sabi-backend",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    {
+      "binding": "JOB_REGISTRY",
+      "id": "placeholder-create-with-wrangler"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FRAMES",
+      "bucket_name": "sabi-frames"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "VerificationAgent",
+        "name": "VerificationAgent"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["VerificationAgent"],
+      "tag": "v1"
+    }
+  ],
+  "vars": {
+    "NVM_ENVIRONMENT": "testing"
+  }
+  // Secrets (set via `wrangler secret put`):
+  // NVM_API_KEY, NVM_PLAN_ID, NVM_AGENT_ID
+}

@@ -1,0 +1,19 @@
+{
+  "name": "sabi-backend",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types env.d.ts --include-runtime false",
+    "db:init": "wrangler d1 execute sabi-db --local --command \"SELECT 1\""
+  },
+  "dependencies": {
+    "@nevermined-io/payments": "^1.1.5",
+    "agents": "^0.7.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250301.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.0.0"
+  }
+}

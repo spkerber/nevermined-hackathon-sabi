@@ -1,46 +1,88 @@
-# Nevermined Hackathon SABI
+# Sabi -- Verifiable Real-World Information
 
-**Visual Verification as a Service** — photo-backed, human-verified proof for real-world questions. Think **X Community Notes** meets **Meta VisionClaw**: requesters get ground truth + evidence (photos + attested answer) that you can use to settle [Kalshi](https://kalshi.com) / [Polymarket](https://polymarket.com) bets, validate event claims, or just know what's really there. Human verifiers with Ray-Ban Meta glasses fulfill requests on location; payment and matching run over Nevermined A2A.
+A2A verification-as-a-service for the Nevermined hackathon. Requesters submit real-world questions (e.g. "How many Fantas are in the vending machine?"), nearby verifiers with Ray-Ban Meta smart glasses go check, capture photo evidence, and answer vocally. Requesters review the artifact (photos + transcribed answer) in a webapp.
 
-### What we're selling
+## Quick start
 
-**Visual Verification** — on-demand, geolocated verification with photo evidence and a human-attested answer. Request a question + location; a nearby verifier (wearing Meta glasses) captures proof and answers; you get an artifact (photos + transcription) and optional community-style scoring. Built for prediction markets, due diligence, and any claim that needs "show me."
+### Backend (Cloudflare Workers)
 
-### What we're buying
+```bash
+cd backend
+npm install
+npx wrangler dev --port 8787
+```
 
-**Event and location intel** that could use a verification layer: times, places, details, and text that would benefit from additional media or validation. We're especially interested in **SF-local** and **AWS Builder Loft**–adjacent events, venues, and people — the kind of intel that's more valuable when someone can go verify it.
+### Webapp (Next.js / Vercel)
 
----
+```bash
+cd webapp
+npm install
+npm run dev
+```
 
-## Pivot
+The webapp connects to the backend at `http://localhost:8787` by default. Set `NEXT_PUBLIC_API_URL` in `webapp/.env.local` to change.
 
-We previously explored a vending machine / map / delivery concept. We've pivoted to the verification service above to better align with hackathon criteria: **buyer** (3+ paid tx, buy from 2+ teams, repeat or multi-seller), **seller** (metered service to 2+ teams, 3+ paid tx, repeat buyers), and **market participation** (cross-team tx, buy + sell, integration).
+### Companion app (iOS -- iPhone + Ray-Ban Metas)
+
+1. Open `companion/CameraAccess.xcodeproj` in Xcode
+2. Copy `companion/CameraAccess/Secrets.swift.example` to `companion/CameraAccess/Secrets.swift` and fill in your Gemini API key and backend URL
+3. Select your iPhone as the build target
+4. Build and run
+
+The companion app connects to the backend to accept verification jobs, streams camera from Ray-Ban Meta glasses (or iPhone camera in test mode), uses Gemini 2.5 Flash for real-time AI-assisted verification, captures photos every 5 seconds, and uploads them to the backend when the verification is complete.
+
+## Architecture
+
+```
+webapp/           Next.js (Vercel) -- requester UI
+backend/          Cloudflare Workers + Agents SDK
+  src/index.ts    Worker entry point (REST API + agent routing)
+  src/verification-agent.ts   Durable Object (SQLite + WebSocket state sync)
+  src/types.ts    Shared types
+companion/        iOS app (VisionClaw fork) -- verifier companion
+  CameraAccess/   Swift source code
+  CameraAccess.xcodeproj   Xcode project
+docs/             PRD, references, team info
+```
+
+### API endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| POST | `/api/verifications` | Create a verification job |
+| GET | `/api/verifications/:id` | Get job status |
+| POST | `/api/verifications/:id/accept` | Verifier accepts job |
+| POST | `/api/verifications/:id/start` | Start verification session |
+| POST | `/api/verifications/:id/frames` | Upload a frame (JPEG) |
+| POST | `/api/verifications/:id/end` | End session with answer |
+| GET | `/api/verifications/:id/artifact` | Get completed artifact |
+| GET | `/api/frames/:key` | Serve frame image from R2 |
+| WS | `/agents/verification-agent/:id` | Real-time status updates |
+
+### Job status lifecycle
+
+`connecting` -> `accepted` -> `in_progress` -> `verified`
+
+### Tech stack
+
+| Layer | Choice |
+|-------|--------|
+| **Backend** | Cloudflare Workers + Agents SDK (Durable Objects, SQLite, R2) |
+| **Webapp** | Next.js on Vercel |
+| **Payments** | Nevermined (x402) -- wired but payment validation deferred |
+| **Companion app** | VisionClaw fork (iPhone + Ray-Ban Metas) |
 
 ## Team
 
 - **Spencer Kerber**
 - **Ben Imadali**
 
-Ben has access and may push from a separate git worktree; pull from `origin` before redoing the PRD.
-
-## Secrets & config
-
-We use **Doppler** for API keys and secrets. For local dev you can still use `.env` (copy from `.env.example`); in CI/deploy, inject via Doppler. Nevermined credentials: `NVM_API_KEY`, `NVM_AGENT_ID`, `NVM_PLAN_ID` (create plan in [Nevermined App](https://nevermined.app)).
-
 ## Docs
 
-- [docs/PRD.md](docs/PRD.md) – Product and technical details.
-- [docs/team.md](docs/team.md) – Team and repo info.
-- [docs/references.md](docs/references.md) – Hackathon and Nevermined links.
-
-## Tech stack (current plan)
-
-| Layer | Choice | Notes |
-|-------|--------|--------|
-| **Payments** | **Nevermined** | Required. A2A payments via x402; register agent + plan, validate/settle with `payment-signature` header. |
-| **Secrets** | **Doppler** | API keys and config; optional local `.env` from `.env.example`. |
-| **Hosting** | **AWS** or **Cloudflare Workers** | TBD (e.g. Lambda + API Gateway, or CF Workers). |
-| **Agents / evals** | **LangChain** | For agent suggestions to purchasers and evals when needed. |
+- [docs/PRD.md](docs/PRD.md) -- Full product requirements
+- [docs/references.md](docs/references.md) -- Hackathon and Nevermined links
+- [docs/team.md](docs/team.md) -- Team info
 
 ## License
 

@@ -36,3 +36,17 @@ Thumbs.db
 .agent-trace/
 tmp/
 *.log
+
+# Cloudflare Workers
+.wrangler/
+.dev.vars
+
+# Next.js
+.next/
+out/
+
+# Webapp env (local only)
+webapp/.env.local
+
+# iOS companion app secrets
+companion/CameraAccess/Secrets.swift
