@@ -6,6 +6,8 @@ export interface Env {
   NVM_ENVIRONMENT: string;
   NVM_PLAN_ID: string;
   NVM_AGENT_ID: string;
+  /** Base URL of hackathon registration site (e.g. https://hackathon.example.com). Used for Discovery API proxy. */
+  HACKATHON_DISCOVERY_BASE_URL?: string;
 }
 
 export type JobStatus = "connecting" | "accepted" | "in_progress" | "verified" | "cancelled";

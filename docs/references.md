@@ -4,6 +4,7 @@
 
 - **Builder guide (Google Doc):** [Autonomous Business Hackathon \| Current Builder Guide](https://docs.google.com/document/d/17SGdLqwsSo0t0fML_az95LL40BBxly-pKJQsJhxCDQ8/edit?tab=t.0)
 - **Marketplace (teams / projects):** [Autonomous Business Hackathon \| Marketplace](https://docs.google.com/spreadsheets/d/1R-ohHM-NZbTJ9KDgiQmNro1zot2rMEf0XtcXyYzZ9yA/edit?gid=0#gid=0)
+- **Discovery API:** Query the marketplace at runtime — `GET /hackathon/register/api/discover?side=sell|buy&category=...`. Our backend proxies this at `GET /api/discover` when `HACKATHON_DISCOVERY_BASE_URL` is set (see [docs/discovery-api.md](discovery-api.md)).
 
 ## Nevermined
 

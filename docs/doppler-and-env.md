@@ -23,7 +23,14 @@ Secrets and config are managed via **Doppler** in CI/deploy; for local dev you c
 | Variable | Description |
 |----------|-------------|
 | `PORT` | Server port (default 3000) |
-| `APP_URL` | Public URL of seller API (for registration endpoint metadata) |
+| `APP_URL` | **Public base URL of your deployed seller** — use your Cloudflare Workers URL (e.g. `https://your-app.workers.dev`). No trailing slash. Nevermined and the hackathon marketplace use this; the buyer endpoint is `APP_URL/query`. |
+
+### Using your Cloudflare deployment URL
+
+1. **Doppler (or .env):** Set `APP_URL` to your Cloudflare Workers deployment base URL (e.g. `https://sabi-api.workers.dev` or your custom domain). No trailing slash.
+2. **Re-register the agent:** Run `npm run register-agent` with this `APP_URL` so Nevermined has the correct endpoint. Add the printed `NVM_AGENT_ID` and `NVM_PLAN_ID` to Doppler if they change.
+3. **Hackathon marketplace:** In the team/agent listing, set **Endpoint URL** to `APP_URL/query` (e.g. `https://sabi-api.workers.dev/query`).
+4. **Cloudflare Worker env:** If the seller runs on Workers, set `APP_URL` (or the equivalent) in the Worker’s env / secrets so it can report the correct URL if needed.
 
 ## Buyer (subscriber) usage
 

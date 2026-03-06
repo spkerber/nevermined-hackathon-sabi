@@ -1,12 +1,13 @@
 /**
- * Buyer agent: order a plan (if needed), get x402 access token, call seller /query.
+ * Buyer agent: order a plan (if needed), get x402 access token, call seller endpoint.
  * Use NVM_API_KEY for the buyer (subscriber). To buy from another team's agent, set
- * NVM_PLAN_ID, NVM_AGENT_ID, SELLER_URL to their plan/agent/endpoint.
+ * NVM_PLAN_ID, NVM_AGENT_ID, SELLER_URL (and optionally SELLER_ENDPOINT_PATH, default /query).
  *
  * Usage:
- *   PLAN_ID=... AGENT_ID=... SELLER_URL=http://localhost:3000 npx tsx scripts/buyer-order-and-call.ts [question]
- *   BUYER_SAVE_RESPONSE_TO=tmp/purchased/response.json  # optional: stash response to file
- * Or use Doppler: doppler run -- npx tsx scripts/buyer-order-and-call.ts
+ *   NVM_PLAN_ID=... NVM_AGENT_ID=... SELLER_URL=... npx tsx scripts/buyer-order-and-call.ts [prompt]
+ *   SELLER_ENDPOINT_PATH=/service   # if seller uses a path other than /query
+ *   BUYER_SAVE_RESPONSE_TO=1        # optional: stash response under tmp/purchased/
+ * Or use Doppler: doppler run -- npm run buyer:order-and-call "prompt"
  *
  * Ref: https://nevermined.ai/docs/integrate/quickstart/5-minute-setup
  */
@@ -18,6 +19,8 @@ import { dirname, resolve, sep } from 'path'
 const PLAN_ID = process.env.NVM_PLAN_ID!
 const AGENT_ID = process.env.NVM_AGENT_ID!
 const SELLER_URL = (process.env.SELLER_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+/** Endpoint path on seller (default /query). Use e.g. /service for agents that use a different path. */
+const SELLER_ENDPOINT_PATH = process.env.SELLER_ENDPOINT_PATH ?? '/query'
 const SAVE_RESPONSE_TO =
   process.env.BUYER_SAVE_RESPONSE_TO === '1' || process.env.BUYER_SAVE_RESPONSE_TO === 'yes' || process.env.BUYER_SAVE_RESPONSE_TO === 'true'
     ? `tmp/purchased/response-${Date.now()}.json`
@@ -61,7 +64,9 @@ async function main() {
   const { accessToken } = await payments.x402.getX402AccessToken(PLAN_ID, AGENT_ID)
 
   const question = process.argv[2] ?? 'Are the vending machines working in the AWS Loft?'
-  const res = await fetch(`${SELLER_URL}/query`, {
+  const path = SELLER_ENDPOINT_PATH.startsWith('/') ? SELLER_ENDPOINT_PATH : `/${SELLER_ENDPOINT_PATH}`
+  const endpoint = `${SELLER_URL}${path}`
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

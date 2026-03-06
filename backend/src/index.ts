@@ -55,6 +55,29 @@ export default {
       }, 200, cors);
     }
 
+    // ── GET /api/discover ── Hackathon Discovery API proxy (discover sellers & buyers at runtime)
+    // Forwards to GET {HACKATHON_DISCOVERY_BASE_URL}/hackathon/register/api/discover?side=sell|buy&category=...
+    if (url.pathname === "/api/discover" && request.method === "GET") {
+      const base = env.HACKATHON_DISCOVERY_BASE_URL?.replace(/\/$/, "");
+      if (!base) {
+        return json(
+          { error: "Discovery API not configured", hint: "Set HACKATHON_DISCOVERY_BASE_URL" },
+          503,
+          cors
+        );
+      }
+      const discoverPath = "/hackathon/register/api/discover";
+      const discoverUrl = `${base}${discoverPath}${url.search}`;
+      try {
+        const res = await fetch(discoverUrl);
+        const data = await res.json().catch(() => ({}));
+        return json(data, res.status, cors);
+      } catch (err) {
+        return json({ error: (err as Error).message }, 502, cors);
+      }
+    }
+
+    // Route WebSocket connections to agents (path: /agents/verification-agent/:id)
     if (url.pathname.startsWith("/agents/")) {
       const agentResp = await routeAgentRequest(request, env);
       if (agentResp) return agentResp;

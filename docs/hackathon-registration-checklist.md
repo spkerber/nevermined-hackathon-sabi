@@ -53,9 +53,11 @@ Without at least one plan linked in Nevermined, the agent won’t appear in Sync
 
 The hackathon and buyers will call your **endpoint URL**. That must be a **public** URL.
 
-- [ ] **Deploy** the seller (e.g. `src/seller/server.ts`) to your chosen host (e.g. AWS, Cloudflare Workers). See README “Tech stack” and [docs/sandbox-to-prod.md](sandbox-to-prod.md).
-- [ ] **Set `APP_URL`** in Doppler (prod) to that public base URL (e.g. `https://api.sabi.example.com`).
-- [ ] **Re-run register-agent** with prod config (`NVM_ENVIRONMENT=live`, prod API key, `APP_URL`) so Nevermined has the correct endpoint. Then **Sync from Nevermined** again on the hackathon dashboard if it doesn’t auto-update.
+- [ ] **Deploy** the seller (e.g. `src/seller/server.ts`) to your chosen host (e.g. **Cloudflare Workers**, AWS). See README “Tech stack” and [docs/sandbox-to-prod.md](sandbox-to-prod.md).
+- [ ] **Set `APP_URL`** in Doppler (and in Cloudflare Worker env if applicable) to your **Cloudflare deployment base URL** (e.g. `https://your-app.workers.dev`). No trailing slash. See [docs/doppler-and-env.md](doppler-and-env.md#using-your-cloudflare-deployment-url).
+- [ ] **Re-run register-agent** with that `APP_URL` so Nevermined has the correct endpoint.
+- [ ] **Hackathon marketplace:** Set **Endpoint URL** to `APP_URL/query` (e.g. `https://your-app.workers.dev/query`). Replace any old URL (e.g. spkerber.com) with this deployed Cloudflare URL.
+- [ ] **Sync from Nevermined** again on the hackathon dashboard if it doesn’t auto-update.
 
 ---
 
@@ -63,10 +65,45 @@ The hackathon and buyers will call your **endpoint URL**. That must be a **publi
 
 Hackathon criteria mention buying from 2+ teams, repeat/multi-seller, etc. To support that:
 
-- [ ] **Add buy-side agent** — On the hackathon dashboard, **“Add Buy-Side Agent”** and describe the services SABI needs (e.g. event/location intel, SF-local and AWS Builder Loft–adjacent events/venues).
-- [ ] **Integrate** — Use your API key and the Nevermined Payments library to purchase and call other teams’ agents (see [docs/buy-from-another-agent.md](buy-from-another-agent.md) if present).
+### 4a. Add buy-side agent on the hackathon dashboard
 
-You don’t need to register an agent on Nevermined to **buy**; your API key + Payments library is enough to purchase and call other agents.
+- [ ] On the hackathon dashboard, click **“Add Buy-Side Agent”**.
+- [ ] In the description field, paste or adapt the text below so other teams can see what SABI is looking to buy:
+
+**Description\*** (what the agent does when buying):
+
+```
+SABI's buyer agent discovers and purchases event and location intel from other teams — data feeds, calendars, or agent outputs — so we can verify that information on the ground with photo evidence and human-attested answers. We use what we buy to fuel our verification service and create richer, evidence-backed answers for requesters.
+```
+
+**Buy-Side Interests\*** (what we will buy):
+
+```
+Event and location intel: times, places, details, and text that would benefit from verification. We're especially interested in SF-local and AWS Builder Loft–adjacent events, venues, and people. Open to data feeds, calendars, or agent outputs we can verify on the ground.
+```
+
+### 4b. Use the Payments library to buy from other teams
+
+- [ ] **Get another team’s details** — From the marketplace or the other team: their **Plan ID**, **Agent ID**, and **Seller URL** (base URL of their API).
+- [ ] **Set env** (or a Doppler config, e.g. `buy-external`):
+  - `NVM_API_KEY` = your buyer/subscriber key (same key is fine for testing)
+  - `NVM_PLAN_ID` = their plan ID
+  - `NVM_AGENT_ID` = their agent ID
+  - `SELLER_URL` = their API base URL (e.g. `https://their-agent.example.com`)
+- [ ] **Run the buyer script:**
+  ```bash
+  doppler run -- npm run buyer:order-and-call "optional prompt or question"
+  ```
+  To **save the response** (e.g. for proof you bought from them):
+  ```bash
+  BUYER_SAVE_RESPONSE_TO=1 doppler run -- npm run buyer:order-and-call "optional prompt"
+  ```
+  Responses are written under `tmp/purchased/` (gitignored).
+- [ ] **Repeat for a second team** — Change `NVM_PLAN_ID`, `NVM_AGENT_ID`, and `SELLER_URL` to the other team’s values and run again.
+
+Full steps and stash paths: [docs/buy-from-another-agent.md](buy-from-another-agent.md).
+
+You don’t need to register an agent on Nevermined to **buy**; your API key + the buyer script (or Payments library) is enough to order plans and call other agents.
 
 ---
 
@@ -81,6 +118,9 @@ You don’t need to register an agent on Nevermined to **buy**; your API key + P
 | Sync agent/plans into hackathon | **Hackathon dashboard** → “Sync from Nevermined” |
 | Category, services offered, services per request | **Hackathon dashboard** (after Sync) |
 | Deploy seller so endpoint is public | **Your infra** (AWS, Cloudflare, etc.); set `APP_URL`, re-register if needed |
+| Add buy-side agent (description) | **Hackathon dashboard** → “Add Buy-Side Agent” (use copy-paste in §4a) |
+| Buy from another team’s agent | **This repo**: set their plan/agent/URL, then `doppler run -- npm run buyer:order-and-call`; see [buy-from-another-agent.md](buy-from-another-agent.md) |
+| Discover sellers/buyers at runtime | **Backend:** set `HACKATHON_DISCOVERY_BASE_URL` (hackathon site origin); **Webapp:** use `webapp/lib/discovery-api.ts` → `discoverMarketplace({ side, category })`. See [discovery-api.md](discovery-api.md). |
 
 ---
 

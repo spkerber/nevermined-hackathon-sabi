@@ -33,8 +33,38 @@ To test that our **buyer agent** can purchase from **another team’s** Nevermin
 4. **Repeat for a second team**  
    Change `NVM_PLAN_ID`, `NVM_AGENT_ID`, and `SELLER_URL` to another agent’s values and run again. Use a different `BUYER_SAVE_RESPONSE_TO` path if you want to keep both responses (e.g. `tmp/purchased/team-a.json`, `tmp/purchased/team-b.json`).
 
+## Example: rategenius (MagicStay MarketResearch)
+
+To run a test purchase from **rategenius** (MagicStay Market Research — dynamic pricing engine):
+
+- **Endpoint:** `http://localhost:3003/service` (they use `/service`, not `/query`)
+- **Agent DID:** `19382499784507691897099813046158899650802606062565712631387582302174094534652`
+- **Plan DID:** `97866696145535066453103713195260098266633201693062554670376824816568438944699`
+
+Ensure their service is running on port 3003, then:
+
+```bash
+export NVM_API_KEY=<your-buyer-sandbox-key>
+export NVM_ENVIRONMENT=sandbox
+export NVM_PLAN_ID=97866696145535066453103713195260098266633201693062554670376824816568438944699
+export NVM_AGENT_ID=19382499784507691897099813046158899650802606062565712631387582302174094534652
+export SELLER_URL=http://localhost:3003
+export SELLER_ENDPOINT_PATH=/service
+
+npm run buyer:order-and-call "best rate for a 2-night stay next weekend"
+```
+
+To save the response for proof:
+
+```bash
+BUYER_SAVE_RESPONSE_TO=1 npm run buyer:order-and-call "best rate for a 2-night stay"
+```
+
+If the Nevermined SDK expects full DIDs, try prefixing with `did:nv:` (e.g. `NVM_PLAN_ID=did:nv:97866...`).
+
 ## Notes
 
 - **Credits / USDC:** Each plan order and each request uses credits (or subscription). Don’t overspend; our sandbox plan is 5 USDC for 100 credits.
 - **Same key:** You can use your usual Doppler config and key; only the target plan/agent/URL change when buying from another team.
 - **Stash location:** `tmp/purchased/` is in `.gitignore`; nothing there is committed. Use it to keep purchased responses for demos or proof without polluting the repo.
+- **Other endpoints:** If the seller uses a path other than `/query`, set `SELLER_ENDPOINT_PATH` (e.g. `SELLER_ENDPOINT_PATH=/service`).

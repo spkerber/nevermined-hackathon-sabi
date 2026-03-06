@@ -84,6 +84,17 @@ Ben has access and may push from a separate git worktree; pull from `origin` bef
 
 We use **Doppler** for API keys and secrets. For local dev you can still use `.env` (copy from `.env.example`); in CI/deploy, inject via Doppler. Nevermined credentials: `NVM_API_KEY`, `NVM_AGENT_ID`, `NVM_PLAN_ID` (create plan in [Nevermined App](https://nevermined.app)). See [docs/doppler-and-env.md](docs/doppler-and-env.md) and [docs/sandbox-to-prod.md](docs/sandbox-to-prod.md).
 
+### Deployed URL (Cloudflare → Doppler)
+
+To point the seller and hackathon listing at your deployed worker:
+
+1. **Cloudflare:** Workers & Pages → your worker → copy the deployment URL (e.g. `https://your-worker.workers.dev`).
+2. **Doppler:** In the project config, set **`APP_URL`** to that base URL. No trailing slash (e.g. `https://your-worker.workers.dev`).
+3. **Re-register:** Run `npm run register-agent` with that `APP_URL` so Nevermined has the correct endpoint.
+4. **Marketplace:** In the hackathon dashboard, set **Endpoint URL** to `APP_URL/query` (e.g. `https://your-worker.workers.dev/query`).
+
+Details: [docs/doppler-and-env.md](docs/doppler-and-env.md#using-your-cloudflare-deployment-url), [docs/hackathon-registration-checklist.md](docs/hackathon-registration-checklist.md).
+
 ## Docs
 
 - [docs/PRD.md](docs/PRD.md) -- Full product requirements
