@@ -6,13 +6,18 @@ Product Requirement Document for the SABI hackathon project: verification-as-a-s
 
 ## 1. Overview
 
+### Pitch
+
+- **What we're selling:** **Visual Verification as a Service** — photo-backed, human-verified proof for real-world questions. Think **X Community Notes** meets **Meta VisionClaw**: requesters get ground truth + evidence (photos + attested answer) they can use to settle [Kalshi](https://kalshi.com) / [Polymarket](https://polymarket.com) bets, validate event claims, or confirm what’s actually on the ground.
+- **What we're buying:** **Event and location intel** that could use additional media or validation — times, places, details, and text that become more valuable when verified. Preference for **SF-local** and **AWS Builder Loft**–adjacent events, venues, and people.
+
 ### Purpose
 
-Enable anyone to request verifiable, real-world information -- answered and evidenced by a nearby human verifier wearing Ray-Ban Meta smart glasses. The *product* is the verification service; payment is done via agent-to-agent transaction (Nevermined credits). Verifiers are matched by geolocation from a pool and compensated per job.
+Enable anyone to request verifiable, real-world information — answered and evidenced by a nearby human verifier wearing Ray-Ban Meta smart glasses. The *product* is the verification service; payment is done via agent-to-agent transaction (Nevermined credits). Verifiers are matched by geolocation from a pool and compensated per job.
 
 ### Thesis
 
-The most valuable agents operate at the interface between the abstract digital world and the chaotic physical world. In an era of fake and generated content, verifiable truth about physical reality is increasingly scarce and valuable. Sabi bridges that gap -- turning real humans with wearable hardware into a paid verification layer that AI agents and remote parties can tap into for ground-truth information with photographic evidence. In that sense, Sabi is a form of **OSINT-style verification**: a way to pay for on-demand, real-world intelligence (who, what, where, when) with photo evidence, rather than scraping or aggregating existing open-source data. See [§12 Positioning: OSINT-style verification](#positioning-osint-style-verification).
+The most valuable agents operate at the interface between the abstract digital world and the chaotic physical world. In an era of fake and generated content, verifiable truth about physical reality is increasingly scarce and valuable. Sabi bridges that gap — turning real humans with wearable hardware into a paid verification layer that AI agents and remote parties can tap into for ground-truth information with photographic evidence. In that sense, Sabi is a form of **OSINT-style verification**: a way to pay for on-demand, real-world intelligence (who, what, where, when) with photo evidence, rather than scraping or aggregating existing open-source data. See [§12 Positioning: OSINT-style verification](#positioning-osint-style-verification).
 
 ### Background
 
@@ -39,7 +44,7 @@ The most valuable agents operate at the interface between the abstract digital w
 
 ### The problem
 
-Remote parties need verifiable, real-world information but have no way to get it with evidence. Examples: "How many Fantas are left in this vending machine?", "Is this storefront open right now?", "What's the current condition of this construction site?" There is no marketplace that matches these requests to nearby humans who can physically verify and provide photographic evidence. The same verification-proof pattern applies to **personal or home** ("Is my garage door closed?") and to **outcome resolution** (e.g. prediction or betting markets such as [Kalshi](https://kalshi.com) or [Polymarket](https://polymarket.com), where photo + answer can serve as evidence for real-world outcome resolution). V1 focuses on venue/event and place-based verification; the product is generic verification-as-a-service.
+Remote parties need verifiable, real-world information but have no way to get it with evidence. Examples: "How many Fantas are left in this vending machine?", "Is this storefront open right now?", "What's the current condition of this construction site?" There is no marketplace that matches these requests to nearby humans who can physically verify and provide photographic evidence. The same verification-proof pattern applies to **personal or home** ("Is my garage door closed?") and to **outcome resolution** (e.g. prediction or betting markets such as [Kalshi](https://kalshi.com) or [Polymarket](https://polymarket.com), where photo + answer can serve as evidence for real-world outcome resolution — *visual verification* in the spirit of X Community Notes + VisionClaw). V1 focuses on venue/event and place-based verification, with a bias toward **SF-local and AWS Builder Loft** intel that benefits from media and validation; the product is generic verification-as-a-service.
 
 ### Who has this problem
 
@@ -418,7 +423,7 @@ Sabi can be framed as an **OSINT verification service** or a **way to pay for OS
 
 ### Use case spectrum
 
-- **Venue / event:** "How many Fantas in the vending machine?", "Are there open chairs in the AWS Builders Loft?" (V1 focus).
+- **Venue / event:** "How many Fantas in the vending machine?", "Are there open chairs in the AWS Builders Loft?" (V1 focus). **What we're buying:** event and location intel (times, places, details, text) that would benefit from additional media or validation; preference for **SF-local** and **AWS Builder Loft**–adjacent events, venues, and people.
 - **Retail / place:** "Is this storefront open?", "Condition of this construction site?"
 - **Personal / home:** "Is my garage door closed?" (with appropriate consent and safety).
 - **Markets / resolution:** Verification proof for prediction or betting markets (e.g. [Kalshi](https://kalshi.com), [Polymarket](https://polymarket.com)) — photo + answer as evidence for outcome resolution; V1 is generic verification, not custom market integration.

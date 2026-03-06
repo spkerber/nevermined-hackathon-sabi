@@ -1,6 +1,16 @@
 # Nevermined Hackathon SABI
 
-A2A (agent-to-agent) service for the Nevermined hackathon: we're building a **Meta-glasses physical verification request** service for the shared market. Purchasers request real-world verification (e.g. “Is there food at the lunch counter?”, “Is the vending machine working?”, “Are there open chairs in the AWS Builders Loft?”); human wearers with Meta glasses fulfill requests with photo evidence from their POV; results are scored for veracity/accuracy (community-note style). Users = purchasers and sellers; human-in-the-loop required. An agent can suggest purchase types to purchasers.
+**Visual Verification as a Service** — photo-backed, human-verified proof for real-world questions. Think **X Community Notes** meets **Meta VisionClaw**: requesters get ground truth + evidence (photos + attested answer) that you can use to settle [Kalshi](https://kalshi.com) / [Polymarket](https://polymarket.com) bets, validate event claims, or just know what's really there. Human verifiers with Ray-Ban Meta glasses fulfill requests on location; payment and matching run over Nevermined A2A.
+
+### What we're selling
+
+**Visual Verification** — on-demand, geolocated verification with photo evidence and a human-attested answer. Request a question + location; a nearby verifier (wearing Meta glasses) captures proof and answers; you get an artifact (photos + transcription) and optional community-style scoring. Built for prediction markets, due diligence, and any claim that needs "show me."
+
+### What we're buying
+
+**Event and location intel** that could use a verification layer: times, places, details, and text that would benefit from additional media or validation. We're especially interested in **SF-local** and **AWS Builder Loft**–adjacent events, venues, and people — the kind of intel that's more valuable when someone can go verify it.
+
+---
 
 ## Pivot
 
@@ -19,7 +29,7 @@ We use **Doppler** for API keys and secrets. For local dev you can still use `.e
 
 ## Docs
 
-- [docs/PRD.md](docs/PRD.md) – Product and technical details (**being revised** for the Meta-glasses verification service after Ben’s worktree push).
+- [docs/PRD.md](docs/PRD.md) – Product and technical details.
 - [docs/team.md](docs/team.md) – Team and repo info.
 - [docs/references.md](docs/references.md) – Hackathon and Nevermined links.
 
