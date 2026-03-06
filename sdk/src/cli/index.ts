@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { initCmd } from "./commands/init.js";
 import { verifyCmd } from "./commands/verify.js";
 import { statusCmd } from "./commands/status.js";
 import { listCmd } from "./commands/list.js";
@@ -14,6 +15,7 @@ program
   .description("Sabi CLI — verification-as-a-service powered by Nevermined")
   .version("0.1.0");
 
+program.addCommand(initCmd);
 program.addCommand(verifyCmd);
 program.addCommand(statusCmd);
 program.addCommand(listCmd);
