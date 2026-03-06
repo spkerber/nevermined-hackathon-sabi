@@ -47,7 +47,7 @@ final class SettingsManager {
   // MARK: - Sabi Auth
 
   var sabiApiKey: String? {
-    get { defaults.string(forKey: Key.sabiApiKey.rawValue) ?? Secrets.sabiApiKey }
+    get { defaults.string(forKey: Key.sabiApiKey.rawValue) }
     set { defaults.set(newValue, forKey: Key.sabiApiKey.rawValue) }
   }
 
