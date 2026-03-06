@@ -59,6 +59,26 @@ struct StreamView: View {
           .padding(.bottom, 8)
         }
 
+        // Reconnect banner when Gemini disconnected
+        if !geminiVM.isGeminiActive && geminiVM.errorMessage == nil {
+          Button {
+            Task { await geminiVM.startSession() }
+          } label: {
+            HStack(spacing: 8) {
+              Image(systemName: "arrow.clockwise")
+                .font(.system(size: 14, weight: .semibold))
+              Text("Reconnect AI")
+                .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Color.orange.opacity(0.85))
+            .cornerRadius(10)
+          }
+          .padding(.bottom, 8)
+        }
+
         // Status row
         HStack(spacing: 8) {
           if geminiVM.isGeminiActive {
@@ -189,7 +209,11 @@ struct StreamView: View {
       get: { geminiVM.errorMessage != nil && !geminiVM.wasInterrupted },
       set: { if !$0 { geminiVM.errorMessage = nil } }
     )) {
-      Button("OK") { geminiVM.errorMessage = nil }
+      Button("Retry") {
+        geminiVM.errorMessage = nil
+        Task { await geminiVM.startSession() }
+      }
+      Button("Dismiss", role: .cancel) { geminiVM.errorMessage = nil }
     } message: {
       Text(geminiVM.errorMessage ?? "")
     }
