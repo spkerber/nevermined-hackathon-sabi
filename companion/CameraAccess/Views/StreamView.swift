@@ -236,8 +236,11 @@ struct StreamView: View {
 
     // Use the last AI transcript as the answer, or a default
     let answer = session.answer ?? (geminiVM.aiTranscript.isEmpty ? "Verified by visual inspection" : geminiVM.aiTranscript)
+    let transcript = geminiVM.fullTranscript
     session.endSession(answer: answer)
-    geminiVM.stopSession()
+
+    // Stop Gemini cleanly — clear onDisconnected first to prevent spurious error alerts
+    geminiVM.stopSessionQuietly()
 
     isUploading = true
     uploadStatus = "Uploading..."
@@ -254,7 +257,7 @@ struct StreamView: View {
 
       // End session with answer + transcript
       uploadStatus = "Submitting..."
-      try await apiClient.endSession(jobId: jobId, answer: answer, transcript: geminiVM.fullTranscript)
+      try await apiClient.endSession(jobId: jobId, answer: answer, transcript: transcript)
 
       showVerificationComplete = true
     } catch {

@@ -217,6 +217,12 @@ class GeminiSessionViewModel: ObservableObject {
     aiTranscript = ""
   }
 
+  /// Stop without triggering error alerts — used during intentional completion flow
+  func stopSessionQuietly() {
+    geminiService.onDisconnected = nil
+    stopSession()
+  }
+
   func sendVideoFrameIfThrottled(image: UIImage) {
     guard isGeminiActive, connectionState == .ready else { return }
     let now = Date()
