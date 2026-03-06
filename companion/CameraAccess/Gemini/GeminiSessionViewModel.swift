@@ -10,6 +10,8 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var userTranscript: String = ""
   @Published var aiTranscript: String = ""
   @Published var wasInterrupted: Bool = false
+  /// True only when Gemini disconnected unexpectedly (not intentional stop)
+  @Published var wasDisconnectedUnexpectedly: Bool = false
   /// Full conversation log accumulated across all turns
   @Published var fullTranscript: String = ""
   /// Tracks whether the last transcript entry was from the user (to coalesce fragments)
@@ -40,6 +42,7 @@ class GeminiSessionViewModel: ObservableObject {
 
     isGeminiActive = true
     wasInterrupted = false
+    wasDisconnectedUnexpectedly = false
     fullTranscript = ""
     lastTranscriptSpeaker = ""
     verificationSession.startSession()
@@ -122,6 +125,7 @@ class GeminiSessionViewModel: ObservableObject {
       guard let self else { return }
       Task { @MainActor in
         guard self.isGeminiActive else { return }
+        self.wasDisconnectedUnexpectedly = true
         self.stopSession()
         self.errorMessage = "Connection lost: \(reason ?? "Unknown error")"
       }

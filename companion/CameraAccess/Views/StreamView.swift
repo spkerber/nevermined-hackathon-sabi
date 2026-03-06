@@ -59,8 +59,8 @@ struct StreamView: View {
           .padding(.bottom, 8)
         }
 
-        // Reconnect banner when Gemini disconnected
-        if !geminiVM.isGeminiActive && geminiVM.errorMessage == nil {
+        // Reconnect banner when Gemini disconnected unexpectedly
+        if geminiVM.wasDisconnectedUnexpectedly && !geminiVM.isGeminiActive {
           Button {
             Task { await geminiVM.startSession() }
           } label: {
