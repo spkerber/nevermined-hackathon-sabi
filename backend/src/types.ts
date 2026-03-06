@@ -1,7 +1,7 @@
 export interface Env {
   VerificationAgent: DurableObjectNamespace;
+  JobRegistry: DurableObjectNamespace;
   FRAMES: R2Bucket;
-  JOB_REGISTRY: KVNamespace;
   NVM_API_KEY: string;
   NVM_ENVIRONMENT: string;
   NVM_PLAN_ID: string;
@@ -25,17 +25,15 @@ export interface VerificationJob {
   updated_at: number;
 }
 
-export interface Frame {
-  id: string;
-  job_id: string;
-  r2_key: string;
+export interface FrameMeta {
+  r2Key: string;
   timestamp: number;
 }
 
 export interface AgentState {
   status: JobStatus;
   job: VerificationJob | null;
-  frameCount: number;
+  frames: FrameMeta[];
 }
 
 export interface Artifact {

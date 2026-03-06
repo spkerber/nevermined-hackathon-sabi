@@ -4,12 +4,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-03-01",
   "compatibility_flags": ["nodejs_compat"],
-  "kv_namespaces": [
-    {
-      "binding": "JOB_REGISTRY",
-      "id": "76dd190181424549bc36cf82aac40906"
-    }
-  ],
   "r2_buckets": [
     {
       "binding": "FRAMES",
@@ -21,6 +15,10 @@
       {
         "class_name": "VerificationAgent",
         "name": "VerificationAgent"
+      },
+      {
+        "class_name": "JobRegistry",
+        "name": "JobRegistry"
       }
     ]
   },
@@ -28,6 +26,10 @@
     {
       "new_sqlite_classes": ["VerificationAgent"],
       "tag": "v1"
+    },
+    {
+      "new_sqlite_classes": ["JobRegistry"],
+      "tag": "v2"
     }
   ],
   "vars": {

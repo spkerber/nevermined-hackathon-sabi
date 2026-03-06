@@ -1,7 +1,9 @@
 import { routeAgentRequest, getAgentByName } from "agents";
 import type { Env } from "./types";
+import type { JobRegistry } from "./job-registry";
 
 export { VerificationAgent } from "./verification-agent";
+export { JobRegistry } from "./job-registry";
 
 function corsHeaders(origin: string | null): HeadersInit {
   return {
@@ -18,62 +20,43 @@ function json(data: unknown, status = 200, extraHeaders: HeadersInit = {}): Resp
   });
 }
 
+function getRegistry(env: Env): DurableObjectStub<JobRegistry> {
+  const id = env.JobRegistry.idFromName("global");
+  return env.JobRegistry.get(id) as DurableObjectStub<JobRegistry>;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
     const cors = corsHeaders(origin);
 
-    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors });
     }
 
-    // Health check (before agent routing to avoid interception)
     if (url.pathname === "/health") {
       return json({ status: "ok", timestamp: Date.now() }, 200, cors);
     }
 
-    // ── GET /api/config ── Remote config for mobile app OTA updates
     if (url.pathname === "/api/config" && request.method === "GET") {
       return json({ apiBaseUrl: url.origin }, 200, cors);
     }
 
-    // Route WebSocket connections to agents (path: /agents/verification-agent/:id)
     if (url.pathname.startsWith("/agents/")) {
       const agentResp = await routeAgentRequest(request, env);
       if (agentResp) return agentResp;
     }
 
     // ── GET /api/verifications ── List verification jobs
-    // ?requesterId=X  → all jobs for that requester (any status)
-    // ?verifierId=X   → all jobs this verifier has worked on
-    // no param         → available jobs (connecting only, for verifiers)
     if (url.pathname === "/api/verifications" && request.method === "GET") {
       try {
+        const registry = getRegistry(env);
         const requesterId = url.searchParams.get("requesterId");
         const verifierId = url.searchParams.get("verifierId");
-        const { keys } = await env.JOB_REGISTRY.list();
-        const jobs = [];
-        for (const key of keys) {
-          const meta = await env.JOB_REGISTRY.get(key.name, "json") as {
-            id: string; question: string; category: string;
-            targetLat: number; targetLng: number; status: string;
-            payout: number; requesterId?: string; verifierId?: string;
-            createdAt?: number;
-          } | null;
-          if (!meta) continue;
-          if (requesterId) {
-            if (meta.requesterId === requesterId) jobs.push(meta);
-          } else if (verifierId) {
-            if (meta.verifierId === verifierId) jobs.push(meta);
-          } else {
-            if (meta.status === "connecting") jobs.push(meta);
-          }
-        }
-        if (requesterId || verifierId) {
-          jobs.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-        }
+        const jobs = await registry.listJobs(
+          requesterId ? { requesterId } : verifierId ? { verifierId } : undefined
+        );
         return json({ jobs }, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
@@ -110,8 +93,8 @@ export default {
           requesterId: body.requesterId ?? "anonymous",
         });
 
-        // Register in KV for listing
-        await env.JOB_REGISTRY.put(jobId, JSON.stringify({
+        const registry = getRegistry(env);
+        await registry.addJob({
           id: jobId,
           question: body.question,
           category: body.category ?? "general",
@@ -121,7 +104,7 @@ export default {
           payout: body.payout ?? 5,
           requesterId: body.requesterId ?? "anonymous",
           createdAt: Date.now(),
-        }));
+        });
 
         return json({
           job,
@@ -136,33 +119,14 @@ export default {
     if (url.pathname === "/api/seed" && request.method === "POST") {
       try {
         const dummyJobs = [
-          {
-            question: "Is the coffee shop on 5th Ave currently open?",
-            category: "Business Hours",
-            targetLat: 37.7749, targetLng: -122.4194,
-          },
-          {
-            question: "How many cars are in the parking lot at Whole Foods?",
-            category: "Traffic & Parking",
-            targetLat: 37.7751, targetLng: -122.4180,
-          },
-          {
-            question: "Is there a line at the taco truck on Market St?",
-            category: "Wait Times",
-            targetLat: 37.7739, targetLng: -122.4171,
-          },
-          {
-            question: "What does the specials board say at the deli on 3rd?",
-            category: "Menu & Prices",
-            targetLat: 37.7760, targetLng: -122.4200,
-          },
-          {
-            question: "Is the playground equipment at Dolores Park in good condition?",
-            category: "Infrastructure",
-            targetLat: 37.7596, targetLng: -122.4269,
-          },
+          { question: "Is the coffee shop on 5th Ave currently open?", category: "Business Hours", targetLat: 37.7749, targetLng: -122.4194 },
+          { question: "How many cars are in the parking lot at Whole Foods?", category: "Traffic & Parking", targetLat: 37.7751, targetLng: -122.4180 },
+          { question: "Is there a line at the taco truck on Market St?", category: "Wait Times", targetLat: 37.7739, targetLng: -122.4171 },
+          { question: "What does the specials board say at the deli on 3rd?", category: "Menu & Prices", targetLat: 37.7760, targetLng: -122.4200 },
+          { question: "Is the playground equipment at Dolores Park in good condition?", category: "Infrastructure", targetLat: 37.7596, targetLng: -122.4269 },
         ];
 
+        const registry = getRegistry(env);
         const created = [];
         for (const dummy of dummyJobs) {
           const jobId = crypto.randomUUID();
@@ -179,7 +143,7 @@ export default {
             requesterId: "demo-requester",
           });
 
-          await env.JOB_REGISTRY.put(jobId, JSON.stringify({
+          await registry.addJob({
             id: jobId,
             question: dummy.question,
             category: dummy.category,
@@ -189,7 +153,7 @@ export default {
             payout: 5,
             requesterId: "demo-requester",
             createdAt: Date.now(),
-          }));
+          });
 
           created.push(job);
         }
@@ -221,11 +185,8 @@ export default {
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.acceptJob(body.verifierId);
 
-        // Update KV registry status so it no longer shows as available
-        const existing = await env.JOB_REGISTRY.get(jobId, "json") as Record<string, unknown> | null;
-        if (existing) {
-          await env.JOB_REGISTRY.put(jobId, JSON.stringify({ ...existing, status: "accepted", verifierId: body.verifierId }));
-        }
+        const registry = getRegistry(env);
+        await registry.updateJob(jobId, { status: "accepted", verifierId: body.verifierId });
 
         return json(result, 200, cors);
       } catch (err) {
@@ -233,7 +194,7 @@ export default {
       }
     }
 
-    // ── POST /api/verifications/:id/archive ── Requester cancels/archives a connecting job
+    // ── POST /api/verifications/:id/archive ── Requester cancels/archives
     const archiveMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/archive$/);
     if (archiveMatch && request.method === "POST") {
       try {
@@ -241,8 +202,8 @@ export default {
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.archiveJob();
 
-        // Remove from KV registry
-        await env.JOB_REGISTRY.delete(jobId);
+        const registry = getRegistry(env);
+        await registry.removeJob(jobId);
 
         return json(result, 200, cors);
       } catch (err) {
@@ -258,11 +219,8 @@ export default {
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.cancelJob();
 
-        // Update KV registry so job shows as available again
-        const existing = await env.JOB_REGISTRY.get(jobId, "json") as Record<string, unknown> | null;
-        if (existing) {
-          await env.JOB_REGISTRY.put(jobId, JSON.stringify({ ...existing, status: "connecting" }));
-        }
+        const registry = getRegistry(env);
+        await registry.updateJob(jobId, { status: "connecting" });
 
         return json(result, 200, cors);
       } catch (err) {
@@ -278,10 +236,8 @@ export default {
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.startSession();
 
-        const existing = await env.JOB_REGISTRY.get(jobId, "json") as Record<string, unknown> | null;
-        if (existing) {
-          await env.JOB_REGISTRY.put(jobId, JSON.stringify({ ...existing, status: "in_progress" }));
-        }
+        const registry = getRegistry(env);
+        await registry.updateJob(jobId, { status: "in_progress" });
 
         return json(result, 200, cors);
       } catch (err) {
@@ -320,11 +276,8 @@ export default {
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.endSession(body.answer, body.transcript);
 
-        // Update KV registry status
-        const existing = await env.JOB_REGISTRY.get(jobId, "json") as Record<string, unknown> | null;
-        if (existing) {
-          await env.JOB_REGISTRY.put(jobId, JSON.stringify({ ...existing, status: "verified" }));
-        }
+        const registry = getRegistry(env);
+        await registry.updateJob(jobId, { status: "verified" });
 
         return json(result, 200, cors);
       } catch (err) {
