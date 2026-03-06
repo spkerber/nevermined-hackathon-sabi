@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createVerification, listMyVerifications, getMe, saveNvmKey, getConfig, PaymentRequiredError } from "@/lib/api";
+import { createVerification, listMyVerifications, getMe, saveNvmAgentId, getConfig, PaymentRequiredError } from "@/lib/api";
 import { validateQuestion } from "@/lib/validate-question";
 import { getNvmAppUrl } from "@/lib/nevermined";
 import { getAuth, clearAuth, type AuthState } from "@/lib/auth";
@@ -29,7 +29,7 @@ export default function Home() {
   const router = useRouter();
   const [auth, setAuthState] = useState<AuthState | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [hasNvmKey, setHasNvmKey] = useState(false);
+  const [hasNvmAgentId, setHasNvmAgentId] = useState(false);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,7 +38,7 @@ export default function Home() {
   const [myJobs, setMyJobs] = useState<MyJob[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [showNvmInput, setShowNvmInput] = useState(false);
-  const [nvmKeyInput, setNvmKeyInput] = useState("");
+  const [nvmAgentIdInput, setNvmAgentIdInput] = useState("");
   const [savingNvm, setSavingNvm] = useState(false);
   const [nvmConfig, setNvmConfig] = useState<{ nvmEnvironment: string } | null>(null);
 
@@ -53,7 +53,7 @@ export default function Home() {
 
     // Fetch server-side NVM key status
     getMe().then((me) => {
-      if (me) setHasNvmKey(me.hasNvmKey);
+      if (me) setHasNvmAgentId(me.hasNvmAgentId);
       setAuthChecked(true);
     }).catch(() => setAuthChecked(true));
 
@@ -92,15 +92,15 @@ export default function Home() {
     }
   }, [question]);
 
-  async function handleSaveNvmKey() {
-    const key = nvmKeyInput.trim();
-    if (!key) return;
+  async function handleSaveNvmAgentId() {
+    const id = nvmAgentIdInput.trim();
+    if (!id) return;
     setSavingNvm(true);
     try {
-      await saveNvmKey(key);
-      setHasNvmKey(true);
+      await saveNvmAgentId(id);
+      setHasNvmAgentId(true);
       setShowNvmInput(false);
-      setNvmKeyInput("");
+      setNvmAgentIdInput("");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -124,7 +124,7 @@ export default function Home() {
       return;
     }
 
-    if (!hasNvmKey) {
+    if (!hasNvmAgentId) {
       setShowNvmInput(true);
       return;
     }
@@ -184,12 +184,12 @@ export default function Home() {
         {/* Nevermined connection status */}
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${hasNvmKey ? "bg-emerald-500" : "bg-zinc-600"}`} />
+            <span className={`h-2 w-2 rounded-full ${hasNvmAgentId ? "bg-emerald-500" : "bg-zinc-600"}`} />
             <span className="text-sm text-zinc-400">
-              {hasNvmKey ? "Nevermined connected" : "Not connected"}
+              {hasNvmAgentId ? "Nevermined connected" : "Not connected"}
             </span>
           </div>
-          {!hasNvmKey && (
+          {!hasNvmAgentId && (
             <button
               onClick={() => setShowNvmInput(true)}
               className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
@@ -199,11 +199,11 @@ export default function Home() {
           )}
         </div>
 
-        {/* NVM API Key input */}
-        {showNvmInput && !hasNvmKey && (
+        {/* NVM Agent ID input */}
+        {showNvmInput && !hasNvmAgentId && (
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 space-y-3">
             <p className="text-sm text-zinc-300">
-              Enter your Nevermined API key to pay for verifications.
+              Enter your Nevermined Agent ID to pay for verifications.
               {nvmConfig && (
                 <>
                   {" "}
@@ -220,16 +220,16 @@ export default function Home() {
             </p>
             <div className="flex gap-2">
               <input
-                type="password"
-                value={nvmKeyInput}
-                onChange={(e) => setNvmKeyInput(e.target.value)}
-                placeholder="sandbox:eyJ..."
+                type="text"
+                value={nvmAgentIdInput}
+                onChange={(e) => setNvmAgentIdInput(e.target.value)}
+                placeholder="agent_..."
                 className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                onKeyDown={(e) => e.key === "Enter" && handleSaveNvmKey()}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveNvmAgentId()}
               />
               <button
-                onClick={handleSaveNvmKey}
-                disabled={!nvmKeyInput.trim() || savingNvm}
+                onClick={handleSaveNvmAgentId}
+                disabled={!nvmAgentIdInput.trim() || savingNvm}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
               >
                 {savingNvm ? "..." : "Save"}
@@ -278,7 +278,7 @@ export default function Home() {
           >
             {loading
               ? "Processing payment..."
-              : !hasNvmKey
+              : !hasNvmAgentId
                 ? "Connect & Request Verification"
                 : "Request Verification — 1 Credit"}
           </button>

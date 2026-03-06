@@ -3,7 +3,6 @@ import type { Env } from "./types";
 import type { JobRegistry } from "./job-registry";
 import {
   buildPaymentRequired,
-  build402Response,
   verifyPayment,
   settlePayment,
   getX402AccessToken,
@@ -25,8 +24,7 @@ function corsHeaders(origin: string | null): HeadersInit {
   return {
     "Access-Control-Allow-Origin": origin ?? "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade, payment-signature",
-    "Access-Control-Expose-Headers": "payment-required, payment-response",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade",
   };
 }
 
@@ -90,27 +88,27 @@ export default {
         const body = await request.json() as {
           email?: string;
           password?: string;
-          nvmApiKey?: string;
+          nvmAgentId?: string;
         };
 
         const registry = getAuthRegistry(env);
         const apiKey = generateApiKey();
 
-        // Agent signup: just needs nvmApiKey
-        if (body.nvmApiKey && !body.email) {
+        // Agent signup: just needs nvmAgentId
+        if (body.nvmAgentId && !body.email) {
           const agentEmail = `agent_${crypto.randomUUID().slice(0, 8)}@sabi.local`;
           const account = await registry.createAccount({
             email: agentEmail,
             passwordHash: null,
             apiKey,
-            nvmApiKey: body.nvmApiKey,
+            nvmAgentId: body.nvmAgentId,
           });
           return json({ apiKey: account.apiKey, userId: account.id }, 201, cors);
         }
 
         // Human signup: email + password required
         if (!body.email || !body.password) {
-          return json({ error: "Email and password are required (or nvmApiKey for agent signup)" }, 400, cors);
+          return json({ error: "Email and password are required (or nvmAgentId for agent signup)" }, 400, cors);
         }
         if (body.password.length < 8) {
           return json({ error: "Password must be at least 8 characters" }, 400, cors);
@@ -126,7 +124,7 @@ export default {
           email: body.email,
           passwordHash,
           apiKey,
-          nvmApiKey: body.nvmApiKey,
+          nvmAgentId: body.nvmAgentId,
         });
 
         return json({ apiKey: account.apiKey, userId: account.id, email: account.email }, 201, cors);
@@ -303,21 +301,21 @@ export default {
       const user = await authenticateRequest(request, env);
       if (!user) return json({ error: "Unauthorized" }, 401, cors);
       const registry = getAuthRegistry(env);
-      const nvmKey = await registry.getNvmApiKey(user.id);
-      return json({ userId: user.id, email: user.email, hasNvmKey: !!nvmKey }, 200, cors);
+      const nvmAgentId = await registry.getNvmAgentId(user.id);
+      return json({ userId: user.id, email: user.email, hasNvmAgentId: !!nvmAgentId }, 200, cors);
     }
 
-    // ── PUT /api/auth/nvm-key ── Attach or update Nevermined API key
-    if (url.pathname === "/api/auth/nvm-key" && request.method === "PUT") {
+    // ── PUT /api/auth/nvm-agent-id ── Attach or update Nevermined Agent ID
+    if (url.pathname === "/api/auth/nvm-agent-id" && request.method === "PUT") {
       const user = await authenticateRequest(request, env);
       if (!user) return json({ error: "Unauthorized" }, 401, cors);
       try {
-        const body = await request.json() as { nvmApiKey: string };
-        if (!body.nvmApiKey) {
-          return json({ error: "nvmApiKey is required" }, 400, cors);
+        const body = await request.json() as { nvmAgentId: string };
+        if (!body.nvmAgentId) {
+          return json({ error: "nvmAgentId is required" }, 400, cors);
         }
         const registry = getAuthRegistry(env);
-        await registry.setNvmApiKey(user.id, body.nvmApiKey);
+        await registry.setNvmAgentId(user.id, body.nvmAgentId);
         return json({ ok: true }, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
@@ -389,24 +387,21 @@ export default {
       try {
         const paymentRequired = buildPaymentRequired(env, "/api/verifications", "POST");
 
-        // Resolve payment token: explicit header > stored NVM key
-        let accessToken = request.headers.get("payment-signature");
-        if (!accessToken) {
-          const authRegistry = getAuthRegistry(env);
-          const nvmKey = await authRegistry.getNvmApiKey(user.id);
-          if (nvmKey) {
-            accessToken = await getX402AccessToken(env, nvmKey);
-          }
+        // Resolve buyer's Nevermined Agent ID
+        const authRegistry = getAuthRegistry(env);
+        const buyerAgentId = await authRegistry.getNvmAgentId(user.id);
+
+        if (!buyerAgentId) {
+          return json({ error: "Nevermined Agent ID required. Set it via PUT /api/auth/nvm-agent-id" }, 402, cors);
         }
 
-        if (!accessToken) {
-          return build402Response(paymentRequired, cors);
-        }
+        // Get access token using our server key + buyer's agent ID
+        const accessToken = await getX402AccessToken(env, buyerAgentId);
 
         // Verify the requester has sufficient credits
         const verification = await verifyPayment(env, accessToken, paymentRequired, 1n);
         if (!verification.isValid) {
-          return build402Response(paymentRequired, cors);
+          return json({ error: "Insufficient credits. Purchase more on Nevermined." }, 402, cors);
         }
 
         const body = await request.json() as {

@@ -29,14 +29,14 @@ export async function getMe() {
     headers: authHeaders(),
   });
   if (!res.ok) return null;
-  return res.json() as Promise<{ userId: string; email: string; hasNvmKey: boolean }>;
+  return res.json() as Promise<{ userId: string; email: string; hasNvmAgentId: boolean }>;
 }
 
-export async function saveNvmKey(nvmApiKey: string) {
-  const res = await fetch(`${API_BASE}/api/auth/nvm-key`, {
+export async function saveNvmAgentId(nvmAgentId: string) {
+  const res = await fetch(`${API_BASE}/api/auth/nvm-agent-id`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ nvmApiKey }),
+    body: JSON.stringify({ nvmAgentId }),
   });
   return handleResponse(res);
 }

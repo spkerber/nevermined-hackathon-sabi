@@ -7,7 +7,7 @@ export interface Account {
   email: string;
   passwordHash: string | null;
   apiKey: string;
-  nvmApiKey: string | null;
+  nvmAgentId: string | null;
   githubId: string | null;
   googleId: string | null;
   createdAt: number;
@@ -44,7 +44,7 @@ export class AuthRegistry extends DurableObject<Env> {
     email: string;
     passwordHash: string | null;
     apiKey: string;
-    nvmApiKey?: string;
+    nvmAgentId?: string;
     githubId?: string;
     googleId?: string;
   }): Promise<Account> {
@@ -60,7 +60,7 @@ export class AuthRegistry extends DurableObject<Env> {
       email: params.email,
       passwordHash: params.passwordHash,
       apiKey: params.apiKey,
-      nvmApiKey: params.nvmApiKey ?? null,
+      nvmAgentId: params.nvmAgentId ?? null,
       githubId: params.githubId ?? null,
       googleId: params.googleId ?? null,
       createdAt: Date.now(),
@@ -121,18 +121,18 @@ export class AuthRegistry extends DurableObject<Env> {
     await this.save();
   }
 
-  async setNvmApiKey(accountId: string, nvmApiKey: string): Promise<void> {
+  async setNvmAgentId(accountId: string, nvmAgentId: string): Promise<void> {
     await this.ensureLoaded();
     const account = this.accounts.get(accountId);
     if (!account) throw new Error("Account not found");
-    account.nvmApiKey = nvmApiKey;
+    account.nvmAgentId = nvmAgentId;
     await this.save();
   }
 
-  async getNvmApiKey(accountId: string): Promise<string | null> {
+  async getNvmAgentId(accountId: string): Promise<string | null> {
     await this.ensureLoaded();
     const account = this.accounts.get(accountId);
-    return account?.nvmApiKey ?? null;
+    return account?.nvmAgentId ?? null;
   }
 
   async getFullAccount(apiKey: string): Promise<Account | null> {

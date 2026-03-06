@@ -88,11 +88,11 @@ export class SabiClient {
     return this.platformConfig;
   }
 
-  async signup(nvmApiKey: string): Promise<{ apiKey: string; userId: string }> {
+  async signup(nvmAgentId: string): Promise<{ apiKey: string; userId: string }> {
     return this.request("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nvmApiKey }),
+      body: JSON.stringify({ nvmAgentId }),
     });
   }
 

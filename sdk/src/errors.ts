@@ -16,7 +16,7 @@ export class ApiError extends SabiError {
 }
 
 export class PaymentRequiredError extends SabiError {
-  constructor(message = "Payment required. Set NVM_API_KEY or run: sabi config nvmApiKey <key>") {
+  constructor(message = "Payment required. Set your Nevermined Agent ID via: sabi config nvmAgentId <id>") {
     super(message);
     this.name = "PaymentRequiredError";
   }

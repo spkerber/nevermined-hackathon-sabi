@@ -32,7 +32,6 @@ export function clearAuth() {
   localStorage.removeItem(USER_STORAGE);
   // Also clear legacy keys
   localStorage.removeItem("sabi_requester_id");
-  localStorage.removeItem("sabi_nvm_api_key");
 }
 
 export function getApiKey(): string | null {

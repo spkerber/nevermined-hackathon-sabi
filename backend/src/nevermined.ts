@@ -105,21 +105,21 @@ export async function verifyPayment(
 
 export async function getX402AccessToken(
   env: Env,
-  nvmApiKey: string,
+  buyerAgentId: string,
 ): Promise<string> {
   const backend = getBackend(env);
   const res = await fetch(`${backend}/api/v1/x402/permissions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${nvmApiKey}`,
+      Authorization: `Bearer ${env.NVM_API_KEY}`,
     },
     body: JSON.stringify({
       accepted: {
         scheme: "nvm:erc4337",
         network: "eip155:84532",
         planId: env.NVM_PLAN_ID,
-        extra: { agentId: env.NVM_AGENT_ID },
+        extra: { agentId: buyerAgentId },
       },
     }),
   });
