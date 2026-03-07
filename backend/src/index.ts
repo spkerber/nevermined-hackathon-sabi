@@ -178,6 +178,39 @@ export default {
       }
     }
 
+    // ── GET /api/frames/:key+ ── Serve a frame image from R2 (payment-gated, no auth needed for <img> tags)
+    const framesServeMatch = url.pathname.match(/^\/api\/frames\/(.+)$/);
+    if (framesServeMatch && request.method === "GET") {
+      const r2Key = framesServeMatch[1];
+
+      const jobId = r2Key.split("/")[0];
+      if (jobId) {
+        try {
+          const agent = await getAgentByName(env.VerificationAgent, jobId);
+          const status = await agent.getStatus();
+          if (!status.job?.payment_tx) {
+            return json({ error: "Payment required to access frames" }, 402, cors);
+          }
+        } catch {
+          return json({ error: "Job not found" }, 404, cors);
+        }
+      }
+
+      const object = await env.FRAMES.get(r2Key);
+
+      if (!object) {
+        return json({ error: "Frame not found" }, 404, cors);
+      }
+
+      return new Response(object.body, {
+        headers: {
+          "Content-Type": object.httpMetadata?.contentType ?? "image/jpeg",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          ...cors,
+        },
+      });
+    }
+
     // --- Auth required for all routes below ---
 
     // WebSocket connections need auth via query param since headers aren't supported
@@ -492,39 +525,6 @@ export default {
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }
-    }
-
-    // ── GET /api/frames/:key+ ── Serve a frame image from R2 (payment-gated)
-    const framesServeMatch = url.pathname.match(/^\/api\/frames\/(.+)$/);
-    if (framesServeMatch && request.method === "GET") {
-      const r2Key = framesServeMatch[1];
-
-      const jobId = r2Key.split("/")[0];
-      if (jobId) {
-        try {
-          const agent = await getAgentByName(env.VerificationAgent, jobId);
-          const status = await agent.getStatus();
-          if (!status.job?.payment_tx) {
-            return json({ error: "Payment required to access frames" }, 402, cors);
-          }
-        } catch {
-          return json({ error: "Job not found" }, 404, cors);
-        }
-      }
-
-      const object = await env.FRAMES.get(r2Key);
-
-      if (!object) {
-        return json({ error: "Frame not found" }, 404, cors);
-      }
-
-      return new Response(object.body, {
-        headers: {
-          "Content-Type": object.httpMetadata?.contentType ?? "image/jpeg",
-          "Cache-Control": "public, max-age=31536000, immutable",
-          ...cors,
-        },
-      });
     }
 
     return json({ error: "Not found" }, 404, cors);
