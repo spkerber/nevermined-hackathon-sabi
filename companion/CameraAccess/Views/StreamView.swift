@@ -59,6 +59,26 @@ struct StreamView: View {
           .padding(.bottom, 8)
         }
 
+        // Reconnect banner when Gemini disconnected unexpectedly
+        if geminiVM.wasDisconnectedUnexpectedly && !geminiVM.isGeminiActive {
+          Button {
+            Task { await geminiVM.startSession() }
+          } label: {
+            HStack(spacing: 8) {
+              Image(systemName: "arrow.clockwise")
+                .font(.system(size: 14, weight: .semibold))
+              Text("Reconnect AI")
+                .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Color.orange.opacity(0.85))
+            .cornerRadius(10)
+          }
+          .padding(.bottom, 8)
+        }
+
         // Status row
         HStack(spacing: 8) {
           if geminiVM.isGeminiActive {
@@ -189,7 +209,11 @@ struct StreamView: View {
       get: { geminiVM.errorMessage != nil && !geminiVM.wasInterrupted },
       set: { if !$0 { geminiVM.errorMessage = nil } }
     )) {
-      Button("OK") { geminiVM.errorMessage = nil }
+      Button("Retry") {
+        geminiVM.errorMessage = nil
+        Task { await geminiVM.startSession() }
+      }
+      Button("Dismiss", role: .cancel) { geminiVM.errorMessage = nil }
     } message: {
       Text(geminiVM.errorMessage ?? "")
     }
@@ -212,8 +236,11 @@ struct StreamView: View {
 
     // Use the last AI transcript as the answer, or a default
     let answer = session.answer ?? (geminiVM.aiTranscript.isEmpty ? "Verified by visual inspection" : geminiVM.aiTranscript)
+    let transcript = geminiVM.fullTranscript
     session.endSession(answer: answer)
-    geminiVM.stopSession()
+
+    // Stop Gemini cleanly — clear onDisconnected first to prevent spurious error alerts
+    geminiVM.stopSessionQuietly()
 
     isUploading = true
     uploadStatus = "Uploading..."
@@ -230,7 +257,7 @@ struct StreamView: View {
 
       // End session with answer + transcript
       uploadStatus = "Submitting..."
-      try await apiClient.endSession(jobId: jobId, answer: answer, transcript: geminiVM.fullTranscript)
+      try await apiClient.endSession(jobId: jobId, answer: answer, transcript: transcript)
 
       showVerificationComplete = true
     } catch {

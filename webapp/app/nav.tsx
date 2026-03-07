@@ -4,19 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/", label: "Request", icon: "🔍" },
-  { href: "/jobs", label: "Verify", icon: "📷" },
+  { href: "/", label: "Request" },
+  { href: "/jobs", label: "Verify" },
 ];
 
 export function Nav() {
   const pathname = usePathname();
+  const isLoginPage = pathname === "/login";
+  if (isLoginPage) return null;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-sabi-border bg-sabi-bg/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl font-bold tracking-tight">Sabi</span>
-          <span className="hidden sm:inline rounded-full bg-indigo-600/20 px-2 py-0.5 text-[10px] font-medium text-indigo-400 uppercase tracking-wider">
+          <span className="text-xl font-bold tracking-tight text-sabi-text">Sabi</span>
+          <span className="hidden sm:inline rounded bg-sabi-accent/15 px-2 py-0.5 text-[10px] font-medium text-sabi-accent uppercase tracking-wider">
             Beta
           </span>
         </Link>
@@ -31,13 +33,12 @@ export function Nav() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-zinc-800 text-zinc-100"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
+                    ? "bg-sabi-surface text-sabi-text border border-sabi-border"
+                    : "text-sabi-muted hover:text-sabi-text hover:bg-sabi-surface"
                 }`}
               >
-                <span className="text-xs">{link.icon}</span>
                 {link.label}
               </Link>
             );

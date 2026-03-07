@@ -23,14 +23,28 @@ Secrets and config are managed via **Doppler** in CI/deploy; for local dev you c
 | Variable | Description |
 |----------|-------------|
 | `PORT` | Server port (default 3000) |
-| `APP_URL` | **Public base URL of your deployed seller** — use your Cloudflare Workers URL (e.g. `https://your-app.workers.dev`). No trailing slash. Nevermined and the hackathon marketplace use this; the buyer endpoint is `APP_URL/query`. |
+| `APP_URL` | **Public base URL of your deployed seller** — our backend: `https://sabi-backend.ben-imadali.workers.dev`. No trailing slash. Nevermined and the hackathon marketplace use this; the buyer endpoint is `APP_URL/query`. |
+| `REMOTION_API_KEY` | Remotion API key (for demo-video cloud render or team features) | [Remotion](https://remotion.dev) → Account. Optional; Remotion is [free for individuals](https://www.remotion.dev/docs); local Studio and render work without any key. |
 
 ### Using your Cloudflare deployment URL
 
-1. **Doppler (or .env):** Set `APP_URL` to your Cloudflare Workers deployment base URL (e.g. `https://sabi-api.workers.dev` or your custom domain). No trailing slash.
+1. **Doppler (or .env):** Set `APP_URL` to `https://sabi-backend.ben-imadali.workers.dev` (our deployed backend). No trailing slash.
 2. **Re-register the agent:** Run `npm run register-agent` with this `APP_URL` so Nevermined has the correct endpoint. Add the printed `NVM_AGENT_ID` and `NVM_PLAN_ID` to Doppler if they change.
-3. **Hackathon marketplace:** In the team/agent listing, set **Endpoint URL** to `APP_URL/query` (e.g. `https://sabi-api.workers.dev/query`).
+3. **Hackathon marketplace:** In the team/agent listing, set **Endpoint URL** to `https://sabi-backend.ben-imadali.workers.dev/query`.
 4. **Cloudflare Worker env:** If the seller runs on Workers, set `APP_URL` (or the equivalent) in the Worker’s env / secrets so it can report the correct URL if needed.
+
+### Nevermined App — API Configuration
+
+In the **Nevermined App**, your agent has an **API Configuration** section. Set the base URL to your deployed seller URL (from Doppler `APP_URL`) so buyers and the proxy hit the right origin.
+
+| Field | Set to |
+|-------|--------|
+| **Protected API Endpoints** → POST | `https://sabi-backend.ben-imadali.workers.dev/query` |
+| **Agent Definition URL** | `https://sabi-backend.ben-imadali.workers.dev/` |
+
+After setting `APP_URL` in Doppler to your Cloudflare URL, use that same base above. Add the **test4test USDC** and **test4test USD** plans to Protected API Endpoints (see [docs/agent-permissions-x402.md](agent-permissions-x402.md)). You can re-run `npm run register-agent` to push the new URLs to Nevermined if the registration API updates the agent; otherwise edit these fields manually in the Nevermined App under your agent → API Configuration → *View and edit all API configuration details*.
+
+We follow Nevermined’s **Static Resources Protection & Monetization** pattern: the Worker is the origin; Nevermined validates payment (x402) and may proxy to it. See [docs.nevermined.app](https://docs.nevermined.app/llms.txt) (doc index) and the [Static Resources Protection](https://nevermined.ai/docs/solutions/access-control-monetization-static-resources) guide.
 
 ## Buyer (subscriber) usage
 

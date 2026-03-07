@@ -45,12 +45,24 @@ struct VerificationJobView: View {
         .padding(.bottom, 12)
 
         // Tab picker
-        Picker("", selection: $selectedTab) {
+        HStack(spacing: 0) {
           ForEach(JobTab.allCases, id: \.self) { tab in
-            Text(tab.rawValue).tag(tab)
+            Button {
+              selectedTab = tab
+            } label: {
+              Text(tab.rawValue)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(selectedTab == tab ? .black : .white.opacity(0.6))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(selectedTab == tab ? Color.white : Color.white.opacity(0.1))
+                .cornerRadius(8)
+            }
           }
         }
-        .pickerStyle(.segmented)
+        .padding(3)
+        .background(Color.white.opacity(0.1))
+        .cornerRadius(10)
         .padding(.horizontal, 20)
         .padding(.bottom, 16)
 
@@ -179,7 +191,9 @@ struct VerificationJobView: View {
     } else {
       LazyVStack(spacing: 12) {
         ForEach(myJobs) { job in
-          HistoryJobCard(job: job)
+          HistoryJobCard(job: job, onResume: (job.status == "in_progress" || job.status == "accepted") ? {
+            Task { await resumeJob(job) }
+          } : nil)
         }
       }
       .padding(.horizontal, 20)
@@ -198,6 +212,7 @@ struct VerificationJobView: View {
   private func loadJobs() async {
     isLoading = true
     errorMessage = nil
+    defer { isLoading = false }
     do {
       let fetched = try await apiClient.listAvailableJobs()
       if !Task.isCancelled {
@@ -210,14 +225,12 @@ struct VerificationJobView: View {
         errorMessage = error.localizedDescription
       }
     }
-    if !Task.isCancelled {
-      isLoading = false
-    }
   }
 
   private func loadMyJobs() async {
     isLoading = true
     errorMessage = nil
+    defer { isLoading = false }
     do {
       let fetched = try await apiClient.listMyVerifications(verifierId: "iphone-verifier")
       if !Task.isCancelled {
@@ -230,14 +243,12 @@ struct VerificationJobView: View {
         errorMessage = error.localizedDescription
       }
     }
-    if !Task.isCancelled {
-      isLoading = false
-    }
   }
 
   private func seedAndRefresh() async {
     isLoading = true
     errorMessage = nil
+    defer { isLoading = false }
     do {
       try await apiClient.seedJobs()
       let fetched = try await apiClient.listAvailableJobs()
@@ -250,9 +261,6 @@ struct VerificationJobView: View {
       if !Task.isCancelled {
         errorMessage = error.localizedDescription
       }
-    }
-    if !Task.isCancelled {
-      isLoading = false
     }
   }
 
@@ -279,6 +287,19 @@ struct VerificationJobView: View {
       }
     }
     acceptingJobId = nil
+  }
+
+  private func resumeJob(_ job: AvailableJob) async {
+    errorMessage = nil
+    do {
+      // Only call startSession if the job is still in accepted state
+      if job.status == "accepted" {
+        try await apiClient.startSession(jobId: job.id)
+      }
+      onJobAccepted(job.id, job.question)
+    } catch {
+      errorMessage = error.localizedDescription
+    }
   }
 
   private func distanceString(to job: AvailableJob) -> String {
@@ -390,6 +411,7 @@ private struct JobCard: View {
 
 private struct HistoryJobCard: View {
   let job: AvailableJob
+  let onResume: (() -> Void)?
 
   private var statusColor: Color {
     switch job.status {
@@ -441,9 +463,25 @@ private struct HistoryJobCard: View {
         .foregroundColor(.white)
         .lineLimit(2)
 
-      Text(job.category)
-        .font(.system(size: 12))
-        .foregroundColor(.white.opacity(0.5))
+      HStack {
+        Text(job.category)
+          .font(.system(size: 12))
+          .foregroundColor(.white.opacity(0.5))
+
+        Spacer()
+
+        if let onResume, job.status == "in_progress" || job.status == "accepted" {
+          Button(action: onResume) {
+            Text("Resume")
+              .font(.system(size: 13, weight: .bold))
+              .foregroundColor(.black)
+              .padding(.horizontal, 16)
+              .padding(.vertical, 6)
+              .background(Color.blue)
+              .cornerRadius(6)
+          }
+        }
+      }
     }
     .padding(16)
     .background(Color.white.opacity(0.08))

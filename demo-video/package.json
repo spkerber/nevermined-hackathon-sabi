@@ -1,0 +1,23 @@
+{
+  "name": "sabi-demo-video",
+  "version": "1.0.0",
+  "description": "SABI hackathon demo video - Remotion composition",
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "render": "remotion render SabiDemo out/demo.mp4",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "qrcode.react": "^4.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "^5.3.0"
+  },
+  "private": true
+}

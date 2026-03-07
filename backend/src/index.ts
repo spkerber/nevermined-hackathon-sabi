@@ -7,16 +7,25 @@ import {
   verifyPayment,
   settlePayment,
 } from "./nevermined";
+import {
+  hashPassword,
+  verifyPassword,
+  generateApiKey,
+  getAuthRegistry,
+  authenticateRequest,
+  type AuthUser,
+} from "./auth";
 
 export { VerificationAgent } from "./verification-agent";
 export { JobRegistry } from "./job-registry";
+export { AuthRegistry } from "./auth-registry";
 
 function corsHeaders(origin: string | null): HeadersInit {
   return {
     "Access-Control-Allow-Origin": origin ?? "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, Upgrade, payment-signature",
-    "Access-Control-Expose-Headers": "payment-required, payment-response",
+    "Access-Control-Expose-Headers": "payment-required",
   };
 }
 
@@ -32,6 +41,18 @@ function getRegistry(env: Env): DurableObjectStub<JobRegistry> {
   return env.JobRegistry.get(id) as DurableObjectStub<JobRegistry>;
 }
 
+// Paths that don't require auth
+const PUBLIC_PATHS = new Set([
+  "/health",
+  "/api/config",
+  "/api/auth/signup",
+  "/api/auth/login",
+]);
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname) || pathname === "/api/discover";
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -42,6 +63,8 @@ export default {
       return new Response(null, { status: 204, headers: cors });
     }
 
+    // --- Public routes (no auth) ---
+
     if (url.pathname === "/health") {
       return json({ status: "ok", timestamp: Date.now() }, 200, cors);
     }
@@ -51,12 +74,90 @@ export default {
         apiBaseUrl: url.origin,
         nvmEnvironment: env.NVM_ENVIRONMENT,
         nvmPlanId: env.NVM_PLAN_ID,
-        nvmAgentId: env.NVM_AGENT_ID,
       }, 200, cors);
     }
 
-    // ── GET /api/discover ── Hackathon Discovery API proxy (discover sellers & buyers at runtime)
-    // Forwards to GET {HACKATHON_DISCOVERY_BASE_URL}/hackathon/register/api/discover?side=sell|buy&category=...
+    // ── Auth routes ──
+
+    if (url.pathname === "/api/auth/signup" && request.method === "POST") {
+      try {
+        const body = await request.json() as {
+          email?: string;
+          password?: string;
+        };
+
+        const registry = getAuthRegistry(env);
+        const apiKey = generateApiKey();
+
+        // Agent signup: no email/password
+        if (!body.email) {
+          const agentEmail = `agent_${crypto.randomUUID().slice(0, 8)}@sabi.local`;
+          const account = await registry.createAccount({
+            email: agentEmail,
+            passwordHash: null,
+            apiKey,
+          });
+          return json({ apiKey: account.apiKey, userId: account.id }, 201, cors);
+        }
+
+        // Human signup: email + password required
+        if (!body.password) {
+          return json({ error: "Email and password are required (or send empty body for agent signup)" }, 400, cors);
+        }
+        if (body.password.length < 8) {
+          return json({ error: "Password must be at least 8 characters" }, 400, cors);
+        }
+
+        const existing = await registry.getAccountByEmail(body.email);
+        if (existing) {
+          return json({ error: "Account with this email already exists" }, 409, cors);
+        }
+
+        const passwordHash = await hashPassword(body.password);
+        const account = await registry.createAccount({
+          email: body.email,
+          passwordHash,
+          apiKey,
+        });
+
+        return json({ apiKey: account.apiKey, userId: account.id, email: account.email }, 201, cors);
+      } catch (err) {
+        return json({ error: (err as Error).message }, 500, cors);
+      }
+    }
+
+    if (url.pathname === "/api/auth/login" && request.method === "POST") {
+      try {
+        const body = await request.json() as { email: string; password: string };
+        if (!body.email || !body.password) {
+          return json({ error: "Email and password are required" }, 400, cors);
+        }
+
+        const registry = getAuthRegistry(env);
+        const account = await registry.getAccountByEmail(body.email);
+        if (!account || !account.passwordHash) {
+          return json({ error: "Invalid email or password" }, 401, cors);
+        }
+
+        const valid = await verifyPassword(body.password, account.passwordHash);
+        if (!valid) {
+          return json({ error: "Invalid email or password" }, 401, cors);
+        }
+
+        return json({ apiKey: account.apiKey, userId: account.id, email: account.email }, 200, cors);
+      } catch (err) {
+        return json({ error: (err as Error).message }, 500, cors);
+      }
+    }
+
+    // ── GET /api/auth/me ── Get current user info
+    if (url.pathname === "/api/auth/me" && request.method === "GET") {
+      const user = await authenticateRequest(request, env);
+      if (!user) return json({ error: "Unauthorized" }, 401, cors);
+      return json({ userId: user.id, email: user.email }, 200, cors);
+    }
+
+    // ── GET /api/discover ── Hackathon Discovery API proxy
     if (url.pathname === "/api/discover" && request.method === "GET") {
       const base = env.HACKATHON_DISCOVERY_BASE_URL?.replace(/\/$/, "");
       if (!base) {
@@ -77,18 +178,70 @@ export default {
       }
     }
 
-    // Route WebSocket connections to agents (path: /agents/verification-agent/:id)
+    // ── GET /api/frames/:key+ ── Serve a frame image from R2 (payment-gated, no auth needed for <img> tags)
+    const framesServeMatch = url.pathname.match(/^\/api\/frames\/(.+)$/);
+    if (framesServeMatch && request.method === "GET") {
+      const r2Key = framesServeMatch[1];
+
+      const jobId = r2Key.split("/")[0];
+      if (jobId) {
+        try {
+          const agent = await getAgentByName(env.VerificationAgent, jobId);
+          const status = await agent.getStatus();
+          if (!status.job?.payment_tx) {
+            return json({ error: "Payment required to access frames" }, 402, cors);
+          }
+        } catch {
+          return json({ error: "Job not found" }, 404, cors);
+        }
+      }
+
+      const object = await env.FRAMES.get(r2Key);
+
+      if (!object) {
+        return json({ error: "Frame not found" }, 404, cors);
+      }
+
+      return new Response(object.body, {
+        headers: {
+          "Content-Type": object.httpMetadata?.contentType ?? "image/jpeg",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          ...cors,
+        },
+      });
+    }
+
+    // --- Auth required for all routes below ---
+
+    // WebSocket connections need auth via query param since headers aren't supported
     if (url.pathname.startsWith("/agents/")) {
+      // Allow WebSocket upgrade with ?apiKey= query param
+      const apiKeyParam = url.searchParams.get("apiKey");
+      if (apiKeyParam) {
+        const registry = getAuthRegistry(env);
+        const user = await registry.getAccountByApiKey(apiKeyParam);
+        if (!user) return json({ error: "Unauthorized" }, 401, cors);
+      } else {
+        const user = await authenticateRequest(request, env);
+        if (!user) return json({ error: "Unauthorized" }, 401, cors);
+      }
       const agentResp = await routeAgentRequest(request, env);
       if (agentResp) return agentResp;
+    }
+
+    // Authenticate all remaining API routes
+    const user = await authenticateRequest(request, env);
+    if (!user) {
+      return json({ error: "Unauthorized. Provide Authorization: Bearer sabi_sk_..." }, 401, cors);
     }
 
     // ── GET /api/verifications ── List verification jobs
     if (url.pathname === "/api/verifications" && request.method === "GET") {
       try {
         const registry = getRegistry(env);
+        const mine = url.searchParams.get("mine");
         const requesterId = url.searchParams.get("requesterId");
-        const verifierId = url.searchParams.get("verifierId");
+        const verifierId = mine === "true" ? user.id : url.searchParams.get("verifierId");
         const jobs = await registry.listJobs(
           requesterId ? { requesterId } : verifierId ? { verifierId } : undefined
         );
@@ -103,15 +256,13 @@ export default {
       try {
         const paymentRequired = buildPaymentRequired(env, "/api/verifications", "POST");
         const accessToken = request.headers.get("payment-signature");
-
         if (!accessToken) {
           return build402Response(paymentRequired, cors);
         }
 
-        // Verify the requester has sufficient credits
         const verification = await verifyPayment(env, accessToken, paymentRequired, 1n);
         if (!verification.isValid) {
-          return build402Response(paymentRequired, cors);
+          return json({ error: verification.invalidReason ?? "Insufficient credits" }, 402, cors);
         }
 
         const body = await request.json() as {
@@ -119,7 +270,6 @@ export default {
           category?: string;
           targetLat: number;
           targetLng: number;
-          requesterId?: string;
           payout?: number;
         };
 
@@ -144,7 +294,7 @@ export default {
           category: body.category,
           targetLat: body.targetLat,
           targetLng: body.targetLng,
-          requesterId: body.requesterId ?? "anonymous",
+          requesterId: user.id,
           paymentTx: settlement.transaction,
         });
 
@@ -157,13 +307,15 @@ export default {
           targetLng: body.targetLng,
           status: "connecting",
           payout: body.payout ?? 5,
-          requesterId: body.requesterId ?? "anonymous",
+          requesterId: user.id,
           createdAt: Date.now(),
         });
 
+        const webappUrl = (env.WEBAPP_URL ?? "https://webapp-psi-inky.vercel.app").replace(/\/$/, "");
         return json({
           job,
           websocketUrl: `/agents/verification-agent/${jobId}`,
+          viewUrl: `${webappUrl}/verify/${jobId}`,
           payment: {
             transaction: settlement.transaction,
             creditsRedeemed: settlement.creditsRedeemed,
@@ -200,7 +352,7 @@ export default {
             category: dummy.category,
             targetLat: dummy.targetLat,
             targetLng: dummy.targetLng,
-            requesterId: "demo-requester",
+            requesterId: user.id,
           });
 
           await registry.addJob({
@@ -211,7 +363,7 @@ export default {
             targetLng: dummy.targetLng,
             status: "connecting",
             payout: 5,
-            requesterId: "demo-requester",
+            requesterId: user.id,
             createdAt: Date.now(),
           });
 
@@ -245,12 +397,11 @@ export default {
     if (acceptMatch && request.method === "POST") {
       try {
         const jobId = acceptMatch[1];
-        const body = await request.json() as { verifierId: string };
         const agent = await getAgentByName(env.VerificationAgent, jobId);
-        const result = await agent.acceptJob(body.verifierId);
+        const result = await agent.acceptJob(user.id);
 
         const registry = getRegistry(env);
-        await registry.updateJob(jobId, { status: "accepted", verifierId: body.verifierId });
+        await registry.updateJob(jobId, { status: "accepted", verifierId: user.id });
 
         return json({
           ...result,
@@ -368,55 +519,34 @@ export default {
     const artifactMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/artifact$/);
     if (artifactMatch && request.method === "GET") {
       try {
-        const agent = await getAgentByName(env.VerificationAgent, artifactMatch[1]);
+        const jobId = artifactMatch[1];
+        const agent = await getAgentByName(env.VerificationAgent, jobId);
         const status = await agent.getStatus();
 
-        // Only serve artifact if the job was paid for
         if (!status.job?.payment_tx) {
           return json({ error: "Payment required to access artifact" }, 402, cors);
         }
 
         const artifact = await agent.getArtifact();
-        return json(artifact, 200, cors);
+        const webappUrl = (env.WEBAPP_URL ?? "https://webapp-psi-inky.vercel.app").replace(/\/$/, "");
+        const apiBaseUrl = url.origin;
+        const enrichedArtifact = {
+          ...artifact,
+          viewUrl: `${webappUrl}/verify/${jobId}`,
+          apiBaseUrl,
+          frames: artifact.frames.map((f) => ({
+            ...f,
+            url: `${apiBaseUrl}${f.url}`,
+            fullUrl: `${apiBaseUrl}${f.url}`,
+          })),
+        };
+        return json(enrichedArtifact, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }
     }
 
-    // ── GET /api/frames/:key+ ── Serve a frame image from R2 (payment-gated)
-    const framesServeMatch = url.pathname.match(/^\/api\/frames\/(.+)$/);
-    if (framesServeMatch && request.method === "GET") {
-      const r2Key = framesServeMatch[1];
-
-      // Extract jobId from the r2Key (format: jobId/timestamp.jpg)
-      const jobId = r2Key.split("/")[0];
-      if (jobId) {
-        try {
-          const agent = await getAgentByName(env.VerificationAgent, jobId);
-          const status = await agent.getStatus();
-          if (!status.job?.payment_tx) {
-            return json({ error: "Payment required to access frames" }, 402, cors);
-          }
-        } catch {
-          return json({ error: "Job not found" }, 404, cors);
-        }
-      }
-
-      const object = await env.FRAMES.get(r2Key);
-
-      if (!object) {
-        return json({ error: "Frame not found" }, 404, cors);
-      }
-
-      return new Response(object.body, {
-        headers: {
-          "Content-Type": object.httpMetadata?.contentType ?? "image/jpeg",
-          "Cache-Control": "public, max-age=31536000, immutable",
-          ...cors,
-        },
-      });
-    }
-
     return json({ error: "Not found" }, 404, cors);
   },
 } satisfies ExportedHandler<Env>;
+

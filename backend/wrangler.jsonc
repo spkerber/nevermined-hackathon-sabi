@@ -19,6 +19,10 @@
       {
         "class_name": "JobRegistry",
         "name": "JobRegistry"
+      },
+      {
+        "class_name": "AuthRegistry",
+        "name": "AuthRegistry"
       }
     ]
   },
@@ -30,10 +34,15 @@
     {
       "new_sqlite_classes": ["JobRegistry"],
       "tag": "v2"
+    },
+    {
+      "new_sqlite_classes": ["AuthRegistry"],
+      "tag": "v3"
     }
   ],
   "vars": {
-    "NVM_ENVIRONMENT": "sandbox"
+    "NVM_ENVIRONMENT": "sandbox",
+    "WEBAPP_URL": "https://webapp-psi-inky.vercel.app"
   }
   // Secrets (set via `wrangler secret put`):
   // NVM_API_KEY, NVM_PLAN_ID, NVM_AGENT_ID

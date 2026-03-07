@@ -10,8 +10,12 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var userTranscript: String = ""
   @Published var aiTranscript: String = ""
   @Published var wasInterrupted: Bool = false
+  /// True only when Gemini disconnected unexpectedly (not intentional stop)
+  @Published var wasDisconnectedUnexpectedly: Bool = false
   /// Full conversation log accumulated across all turns
   @Published var fullTranscript: String = ""
+  /// Tracks whether the last transcript entry was from the user (to coalesce fragments)
+  private var lastTranscriptSpeaker: String = ""
 
   let verificationSession = VerificationSessionManager()
 
@@ -38,7 +42,9 @@ class GeminiSessionViewModel: ObservableObject {
 
     isGeminiActive = true
     wasInterrupted = false
+    wasDisconnectedUnexpectedly = false
     fullTranscript = ""
+    lastTranscriptSpeaker = ""
     verificationSession.startSession()
 
     // Handle audio interruptions (e.g. incoming phone call)
@@ -78,8 +84,14 @@ class GeminiSessionViewModel: ObservableObject {
       Task { @MainActor in
         // Log completed AI turn to full transcript
         if !self.aiTranscript.isEmpty {
-          self.fullTranscript += "AI: \(self.aiTranscript)\n"
+          if self.lastTranscriptSpeaker == "AI" {
+            self.fullTranscript += self.aiTranscript
+          } else {
+            self.fullTranscript += "\nAI: \(self.aiTranscript)"
+          }
+          self.lastTranscriptSpeaker = "AI"
         }
+        self.fullTranscript += "\n"
         self.userTranscript = ""
       }
     }
@@ -89,12 +101,16 @@ class GeminiSessionViewModel: ObservableObject {
       Task { @MainActor in
         // When user starts speaking, log any pending AI transcript
         if self.userTranscript.isEmpty && !self.aiTranscript.isEmpty {
-          // AI transcript was already logged on turnComplete
           self.aiTranscript = ""
         }
         self.userTranscript += text
-        // Log user speech to full transcript
-        self.fullTranscript += "User: \(text)\n"
+        // Coalesce consecutive user fragments into one "User:" line
+        if self.lastTranscriptSpeaker == "User" {
+          self.fullTranscript += text
+        } else {
+          self.fullTranscript += "\nUser: \(text)"
+          self.lastTranscriptSpeaker = "User"
+        }
       }
     }
 
@@ -109,6 +125,7 @@ class GeminiSessionViewModel: ObservableObject {
       guard let self else { return }
       Task { @MainActor in
         guard self.isGeminiActive else { return }
+        self.wasDisconnectedUnexpectedly = true
         self.stopSession()
         self.errorMessage = "Connection lost: \(reason ?? "Unknown error")"
       }
@@ -171,9 +188,9 @@ class GeminiSessionViewModel: ObservableObject {
       return
     }
 
-    // Send the verification question to Gemini so it knows what to look for
+    // Send the verification question — remind Gemini to stay passive
     if let question = verificationSession.question {
-      geminiService.sendTextMessage("The verification question is: \(question). Please observe through the camera and help me answer this.")
+      geminiService.sendTextMessage("The verification question is: \(question). Wait for the verifier to speak — do not describe what you see or try to answer on your own.")
     }
 
     // Start mic capture
@@ -202,6 +219,12 @@ class GeminiSessionViewModel: ObservableObject {
     isModelSpeaking = false
     userTranscript = ""
     aiTranscript = ""
+  }
+
+  /// Stop without triggering error alerts — used during intentional completion flow
+  func stopSessionQuietly() {
+    geminiService.onDisconnected = nil
+    stopSession()
   }
 
   func sendVideoFrameIfThrottled(image: UIImage) {

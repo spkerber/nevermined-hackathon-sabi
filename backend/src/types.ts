@@ -1,6 +1,7 @@
 export interface Env {
   VerificationAgent: DurableObjectNamespace;
   JobRegistry: DurableObjectNamespace;
+  AuthRegistry: DurableObjectNamespace;
   FRAMES: R2Bucket;
   NVM_API_KEY: string;
   NVM_ENVIRONMENT: string;
@@ -8,6 +9,8 @@ export interface Env {
   NVM_AGENT_ID: string;
   /** Base URL of hackathon registration site (e.g. https://hackathon.example.com). Used for Discovery API proxy. */
   HACKATHON_DISCOVERY_BASE_URL?: string;
+  /** Base URL of the Sabi webapp for artifact viewing (e.g. https://webapp-psi-inky.vercel.app). */
+  WEBAPP_URL?: string;
 }
 
 export type JobStatus = "connecting" | "accepted" | "in_progress" | "verified" | "cancelled";

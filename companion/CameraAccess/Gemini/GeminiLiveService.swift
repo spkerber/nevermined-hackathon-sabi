@@ -29,12 +29,13 @@ class GeminiLiveService: ObservableObject {
 
   private var webSocketTask: URLSessionWebSocketTask?
   private var receiveTask: Task<Void, Never>?
+  private var pingTask: Task<Void, Never>?
   private var connectContinuation: CheckedContinuation<Bool, Never>?
   private let delegate = WebSocketDelegate()
   private var urlSession: URLSession!
   init() {
     let config = URLSessionConfiguration.default
-    config.timeoutIntervalForRequest = 30
+    config.timeoutIntervalForRequest = 60
     self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
   }
 
@@ -99,6 +100,8 @@ class GeminiLiveService: ObservableObject {
   }
 
   func disconnect() {
+    pingTask?.cancel()
+    pingTask = nil
     receiveTask?.cancel()
     receiveTask = nil
     webSocketTask?.cancel(with: .normalClosure, reason: nil)
@@ -214,6 +217,21 @@ class GeminiLiveService: ObservableObject {
     webSocketTask?.send(.string(string)) { _ in }
   }
 
+  private func startPinging() {
+    pingTask?.cancel()
+    pingTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(nanoseconds: 15_000_000_000) // 15s
+        guard !Task.isCancelled else { break }
+        self?.webSocketTask?.sendPing { error in
+          if let error {
+            NSLog("[Gemini] Ping failed: %@", error.localizedDescription)
+          }
+        }
+      }
+    }
+  }
+
   private func startReceiving() {
     receiveTask = Task { [weak self] in
       guard let self else { return }
@@ -256,6 +274,7 @@ class GeminiLiveService: ObservableObject {
     // Setup complete
     if json["setupComplete"] != nil {
       connectionState = .ready
+      startPinging()
       resolveConnect(success: true)
       return
     }

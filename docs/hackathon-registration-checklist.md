@@ -44,6 +44,7 @@ You already have `npm run register-agent`; use it with the **public URL** of you
 | **Services per request** | Critical | e.g. “One verification job: question + location in, artifact (photos + transcribed answer) out.” |
 | Endpoint URL | Auto | Filled from Nevermined agent registration. |
 | Price / metering | Auto | From your payment plan(s). |
+| **Request Structure** (help buyers integrate) | Critical | [hackathon-marketplace-integration.md](hackathon-marketplace-integration.md) — HTTP method, request body (JSON), response example (JSON). |
 
 Without at least one plan linked in Nevermined, the agent won’t appear in Sync; you’ve already created one plan via the script.
 
@@ -56,7 +57,7 @@ The hackathon and buyers will call your **endpoint URL**. That must be a **publi
 - [ ] **Deploy** the seller (e.g. `src/seller/server.ts`) to your chosen host (e.g. **Cloudflare Workers**, AWS). See README “Tech stack” and [docs/sandbox-to-prod.md](sandbox-to-prod.md).
 - [ ] **Set `APP_URL`** in Doppler (and in Cloudflare Worker env if applicable) to your **Cloudflare deployment base URL** (e.g. `https://your-app.workers.dev`). No trailing slash. See [docs/doppler-and-env.md](doppler-and-env.md#using-your-cloudflare-deployment-url).
 - [ ] **Re-run register-agent** with that `APP_URL` so Nevermined has the correct endpoint.
-- [ ] **Hackathon marketplace:** Set **Endpoint URL** to `APP_URL/query` (e.g. `https://your-app.workers.dev/query`). Replace any old URL (e.g. spkerber.com) with this deployed Cloudflare URL.
+- [ ] **Hackathon marketplace:** Set **Endpoint URL** to `https://sabi-backend.ben-imadali.workers.dev/query` (or `APP_URL/query` if using a different deployment).
 - [ ] **Sync from Nevermined** again on the hackathon dashboard if it doesn’t auto-update.
 
 ---

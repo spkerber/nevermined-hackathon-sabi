@@ -1,26 +1,75 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Sabi design tokens — Berkeley Mono–inspired, A11y (WCAG 2.1 AA) */
+/* Light theme (default) */
+:root,
+[data-theme="light"] {
+  --sabi-bg: #fafafa;
+  --sabi-surface: #ffffff;
+  --sabi-border: #e5e5e5;
+  --sabi-text: #0a0a0a;
+  --sabi-muted: #525252;
+  --sabi-accent: #4f6bed;
+  --sabi-accent-hover: #3b5bdb;
+  --sabi-success: #16a34a;
+  --sabi-warning: #ca8a04;
+  --sabi-error: #dc2626;
+  --sabi-focus: #4f6bed;
+  --sabi-inprogress: #2563eb;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --sabi-bg: #0a0a0a;
+  --sabi-surface: #141414;
+  --sabi-border: #262626;
+  --sabi-text: #fafafa;
+  --sabi-muted: #a1a1a1;
+  --sabi-accent: #6b8cff;
+  --sabi-accent-hover: #8ba3ff;
+  --sabi-success: #4ade80;
+  --sabi-warning: #facc15;
+  --sabi-error: #f87171;
+  --sabi-focus: #6b8cff;
+  --sabi-inprogress: #60a5fa;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-sabi-bg: var(--sabi-bg);
+  --color-sabi-surface: var(--sabi-surface);
+  --color-sabi-border: var(--sabi-border);
+  --color-sabi-text: var(--sabi-text);
+  --color-sabi-muted: var(--sabi-muted);
+  --color-sabi-accent: var(--sabi-accent);
+  --color-sabi-accent-hover: var(--sabi-accent-hover);
+  --color-sabi-success: var(--sabi-success);
+  --color-sabi-warning: var(--sabi-warning);
+  --color-sabi-error: var(--sabi-error);
+  --color-sabi-focus: var(--sabi-focus);
+  --color-sabi-inprogress: var(--sabi-inprogress);
+  --font-sans: var(--font-ibm-plex-sans);
+  --font-mono: var(--font-ibm-plex-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--sabi-bg);
+  color: var(--sabi-text);
+  font-family: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Focus ring for keyboard nav (A11y) */
+:focus-visible {
+  outline: 2px solid var(--sabi-focus);
+  outline-offset: 2px;
+}
+
+/* Respect prefers-reduced-motion (A11y) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

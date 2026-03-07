@@ -97,15 +97,41 @@ class AudioManager {
     // iPhone mode: voiceChat for aggressive echo cancellation (mic + speaker co-located)
     // Glasses mode: videoChat for mild AEC (mic is on glasses, speaker is on phone)
     let mode: AVAudioSession.Mode = useIPhoneMode ? .voiceChat : .videoChat
-    try session.setCategory(
-      .playAndRecord,
-      mode: mode,
-      options: [.defaultToSpeaker, .allowBluetoothA2DP]
-    )
+    // .allowBluetooth enables HFP (bidirectional audio for Ray-Ban Metas)
+    // .allowBluetoothA2DP enables high-quality output when HFP input isn't needed
+    // .defaultToSpeaker only in iPhone mode so it doesn't override Bluetooth routing
+    var options: AVAudioSession.CategoryOptions = [.allowBluetooth, .allowBluetoothA2DP]
+    if useIPhoneMode {
+      options.insert(.defaultToSpeaker)
+    }
+    try session.setCategory(.playAndRecord, mode: mode, options: options)
     try session.setPreferredSampleRate(GeminiConfig.inputAudioSampleRate)
     try session.setPreferredIOBufferDuration(0.064)
     try session.setActive(true)
-    NSLog("[Audio] Session mode: %@", useIPhoneMode ? "voiceChat (iPhone)" : "videoChat (glasses)")
+
+    // If glasses are connected, prefer their Bluetooth route for input + output
+    if !useIPhoneMode {
+      preferBluetoothRoute(session: session)
+    }
+
+    NSLog("[Audio] Session mode: %@, route: %@",
+          useIPhoneMode ? "voiceChat (iPhone)" : "videoChat (glasses)",
+          session.currentRoute.outputs.map(\.portName).joined(separator: ", "))
+  }
+
+  private func preferBluetoothRoute(session: AVAudioSession) {
+    // Look for a Bluetooth HFP port and set it as preferred input
+    if let btInput = session.availableInputs?.first(where: { $0.portType == .bluetoothHFP }) {
+      do {
+        try session.setPreferredInput(btInput)
+        NSLog("[Audio] Preferred Bluetooth input: %@", btInput.portName)
+      } catch {
+        NSLog("[Audio] Could not set Bluetooth preferred input: %@", error.localizedDescription)
+      }
+    } else {
+      NSLog("[Audio] No Bluetooth HFP input found — available: %@",
+            session.availableInputs?.map(\.portName).joined(separator: ", ") ?? "none")
+    }
   }
 
   func startCapture() throws {
