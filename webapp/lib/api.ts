@@ -16,6 +16,8 @@ async function handleResponse(res: Response) {
   return res.json();
 }
 
+// ── Requester endpoints ──
+
 export async function createVerification(
   params: {
     question: string;
@@ -91,4 +93,78 @@ export async function getConfig() {
     nvmPlanId: string;
     nvmAgentId: string;
   }>;
+}
+
+// ── Verifier endpoints ──
+
+export async function listAvailableJobs() {
+  const res = await fetch(`${API_BASE}/api/verifications`);
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json() as Promise<{
+    jobs: {
+      id: string;
+      question: string;
+      category: string;
+      status: string;
+      payout: number;
+      targetLat: number;
+      targetLng: number;
+      requesterId: string;
+      createdAt: number;
+    }[];
+  }>;
+}
+
+export async function acceptJob(jobId: string, verifierId: string) {
+  const res = await fetch(`${API_BASE}/api/verifications/${jobId}/accept`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ verifierId }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json();
+}
+
+export async function startSession(jobId: string) {
+  const res = await fetch(`${API_BASE}/api/verifications/${jobId}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json();
+}
+
+export async function uploadFrame(jobId: string, imageBlob: Blob) {
+  const res = await fetch(`${API_BASE}/api/verifications/${jobId}/frames`, {
+    method: "POST",
+    headers: { "Content-Type": "image/jpeg" },
+    body: imageBlob,
+  });
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json() as Promise<{ frameCount: number }>;
+}
+
+export async function endSession(jobId: string, answer: string, transcript?: string) {
+  const res = await fetch(`${API_BASE}/api/verifications/${jobId}/end`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answer, transcript }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json();
+}
+
+export async function cancelJob(jobId: string) {
+  const res = await fetch(`${API_BASE}/api/verifications/${jobId}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json();
+}
+
+export async function seedDemoJobs() {
+  const res = await fetch(`${API_BASE}/api/seed`, { method: "POST" });
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json() as Promise<{ count: number }>;
 }

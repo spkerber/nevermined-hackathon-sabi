@@ -218,7 +218,11 @@ export default {
           created.push(job);
         }
 
-        return json({ created, count: created.length }, 201, cors);
+        return json({
+          created,
+          count: created.length,
+          message: `${created.length} demo verification jobs created. Browse them at /api/verifications or in the webapp.`,
+        }, 201, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }
@@ -248,7 +252,11 @@ export default {
         const registry = getRegistry(env);
         await registry.updateJob(jobId, { status: "accepted", verifierId: body.verifierId });
 
-        return json(result, 200, cors);
+        return json({
+          ...result,
+          message: "Job accepted. Head to the location and start the verification session when you arrive.",
+          nextStep: { action: "POST", url: `/api/verifications/${jobId}/start`, hint: "Call when on-site" },
+        }, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }
@@ -299,7 +307,11 @@ export default {
         const registry = getRegistry(env);
         await registry.updateJob(jobId, { status: "in_progress" });
 
-        return json(result, 200, cors);
+        return json({
+          ...result,
+          message: "Verification session started. Begin capturing photos — upload frames every ~5 seconds.",
+          nextStep: { action: "POST", url: `/api/verifications/${startMatch[1]}/frames`, hint: "Upload JPEG frames" },
+        }, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }
@@ -321,7 +333,11 @@ export default {
 
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.addFrame(r2Key, timestamp);
-        return json(result, 201, cors);
+        return json({
+          ...result,
+          message: `Frame captured. ${result.frameCount} photo${result.frameCount !== 1 ? "s" : ""} in session.`,
+          timestamp,
+        }, 201, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }
@@ -339,7 +355,10 @@ export default {
         const registry = getRegistry(env);
         await registry.updateJob(jobId, { status: "verified" });
 
-        return json(result, 200, cors);
+        return json({
+          ...result,
+          message: "Verification complete. The requester can now review your evidence and answer.",
+        }, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }

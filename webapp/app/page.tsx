@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createVerification, listMyVerifications, getConfig, PaymentRequiredError } from "@/lib/api";
+import { createVerification, listMyVerifications, getConfig, PaymentRequiredError, seedDemoJobs } from "@/lib/api";
 import { validateQuestion } from "@/lib/validate-question";
 import { getStoredApiKey, storeApiKey, clearApiKey, getX402AccessToken, getNvmAppUrl } from "@/lib/nevermined";
 
@@ -16,12 +16,12 @@ interface MyJob {
   createdAt?: number;
 }
 
-const STATUS_STYLES: Record<string, { label: string; color: string }> = {
-  connecting: { label: "Waiting", color: "bg-amber-500" },
-  accepted: { label: "Accepted", color: "bg-indigo-500" },
-  in_progress: { label: "In Progress", color: "bg-blue-500" },
-  verified: { label: "Verified", color: "bg-emerald-500" },
-  cancelled: { label: "Cancelled", color: "bg-zinc-500" },
+const STATUS_STYLES: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+  connecting: { label: "Finding Verifier", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-800/30", icon: "🔍" },
+  accepted: { label: "Verifier En Route", color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-800/30", icon: "🚶" },
+  in_progress: { label: "Capturing Evidence", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-800/30", icon: "📷" },
+  verified: { label: "Verified", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-800/30", icon: "✅" },
+  cancelled: { label: "Cancelled", color: "text-zinc-500", bg: "bg-zinc-500/10 border-zinc-800/30", icon: "✕" },
 };
 
 function getRequesterId(): string {
@@ -32,6 +32,14 @@ function getRequesterId(): string {
     localStorage.setItem("sabi_requester_id", id);
   }
   return id;
+}
+
+function timeAgo(ts: number): string {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
 }
 
 export default function Home() {
@@ -47,6 +55,7 @@ export default function Home() {
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [nvmConfig, setNvmConfig] = useState<{ nvmEnvironment: string; nvmPlanId: string; nvmAgentId: string } | null>(null);
+  const [seeding, setSeeding] = useState(false);
 
   const requesterId = typeof window !== "undefined" ? getRequesterId() : "anonymous";
 
@@ -62,15 +71,15 @@ export default function Home() {
 
   useEffect(() => {
     loadMyJobs();
+    const interval = setInterval(loadMyJobs, 5000);
+    return () => clearInterval(interval);
   }, [loadMyJobs]);
 
-  // Load stored API key and backend config
   useEffect(() => {
     setNvmApiKey(getStoredApiKey());
     getConfig().then(setNvmConfig).catch(console.error);
   }, []);
 
-  // Live validation as user types
   useEffect(() => {
     if (!question.trim()) {
       setValidationHint("");
@@ -99,6 +108,17 @@ export default function Home() {
   function handleDisconnect() {
     clearApiKey();
     setNvmApiKey(null);
+  }
+
+  async function handleSeed() {
+    setSeeding(true);
+    try {
+      await seedDemoJobs();
+      await loadMyJobs();
+    } catch {
+      // ignore
+    }
+    setSeeding(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -144,7 +164,7 @@ export default function Home() {
       router.push(`/verify/${result.job.id}`);
     } catch (err) {
       if (err instanceof PaymentRequiredError) {
-        setError("Insufficient credits. Please purchase credits on Nevermined first.");
+        setError("Insufficient credits. Purchase credits on Nevermined to submit verification requests.");
       } else {
         setError((err as Error).message);
       }
@@ -154,19 +174,25 @@ export default function Home() {
   }
 
   const isValid = question.trim().length > 0 && validateQuestion(question.trim()).valid;
+  const activeJobs = myJobs.filter((j) => j.status !== "cancelled");
+  const verifiedCount = myJobs.filter((j) => j.status === "verified").length;
+  const pendingCount = myJobs.filter((j) => j.status !== "verified" && j.status !== "cancelled").length;
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-6">
+    <main className="flex min-h-[calc(100vh-57px)] flex-col items-center p-6">
       <div className="w-full max-w-lg space-y-8">
-        <div className="text-center space-y-3">
-          <h1 className="text-4xl font-bold tracking-tight">Sabi</h1>
-          <p className="text-zinc-400 text-lg">
-            Get verified, photo-evidenced answers to real-world questions.
+        {/* Hero */}
+        <div className="text-center space-y-3 pt-2">
+          <h1 className="text-3xl font-bold tracking-tight">
+            Get real-world answers,<br />verified with photos.
+          </h1>
+          <p className="text-zinc-500 text-sm max-w-sm mx-auto">
+            Ask a question about a physical place. A verifier with smart glasses will go check, capture evidence, and send you the answer.
           </p>
         </div>
 
-        {/* Nevermined connection status */}
-        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3">
+        {/* Nevermined connection */}
+        <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${nvmApiKey ? "bg-emerald-500" : "bg-zinc-600"}`} />
             <span className="text-sm text-zinc-400">
@@ -192,7 +218,7 @@ export default function Home() {
 
         {/* API Key input */}
         {showApiKeyInput && !nvmApiKey && (
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
             <p className="text-sm text-zinc-300">
               Enter your Nevermined API key to pay for verifications.
               {nvmConfig && (
@@ -229,7 +255,8 @@ export default function Home() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Question form */}
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label htmlFor="question" className="block text-sm font-medium text-zinc-300 mb-2">
               What do you need verified?
@@ -240,7 +267,7 @@ export default function Home() {
               onChange={(e) => setQuestion(e.target.value)}
               placeholder='e.g. "Is the coffee shop on 5th Ave currently open?"'
               rows={3}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
             />
             {validationHint && (
               <div className="mt-2 space-y-1">
@@ -259,13 +286,15 @@ export default function Home() {
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm">{error}</p>
+            <div className="rounded-lg border border-red-800/50 bg-red-950/20 px-3 py-2">
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
           )}
 
           <button
             type="submit"
             disabled={loading || !isValid}
-            className="w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full rounded-xl bg-indigo-600 px-4 py-3.5 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading
               ? "Processing payment..."
@@ -275,14 +304,26 @@ export default function Home() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-zinc-500">
-          A nearby verifier with Ray-Ban Metas will go check and send you photo evidence + a vocal answer.
-        </p>
-
         {/* My Verifications */}
-        <div className="space-y-4 pt-4 border-t border-zinc-800">
+        <div className="space-y-4 pt-2 border-t border-zinc-800">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">My Verifications</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold">My Verifications</h2>
+              {activeJobs.length > 0 && (
+                <div className="flex gap-2">
+                  {pendingCount > 0 && (
+                    <span className="rounded-full bg-amber-500/10 border border-amber-800/30 px-2 py-0.5 text-xs text-amber-400">
+                      {pendingCount} pending
+                    </span>
+                  )}
+                  {verifiedCount > 0 && (
+                    <span className="rounded-full bg-emerald-500/10 border border-emerald-800/30 px-2 py-0.5 text-xs text-emerald-400">
+                      {verifiedCount} done
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               onClick={loadMyJobs}
               className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
@@ -292,34 +333,54 @@ export default function Home() {
           </div>
 
           {loadingJobs ? (
-            <div className="text-center py-8">
-              <p className="text-zinc-500 text-sm">Loading...</p>
+            <div className="space-y-2">
+              {[1, 2].map((i) => (
+                <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 animate-pulse">
+                  <div className="h-4 bg-zinc-800 rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-zinc-800 rounded w-1/3" />
+                </div>
+              ))}
             </div>
           ) : myJobs.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-zinc-500 text-sm">No verifications yet. Submit a question above to get started.</p>
+            <div className="text-center py-10 space-y-4">
+              <div className="text-4xl">🔭</div>
+              <p className="text-zinc-500 text-sm">No verifications yet.</p>
+              <p className="text-zinc-600 text-xs">Submit a question above, or switch to <Link href="/jobs" className="text-indigo-400 hover:text-indigo-300">Verifier mode</Link> to answer requests.</p>
+
+              <button
+                onClick={handleSeed}
+                disabled={seeding}
+                className="mt-2 rounded-lg border border-dashed border-zinc-700 px-4 py-2 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-600 disabled:opacity-50 transition-colors"
+              >
+                {seeding ? "Creating..." : "Load demo jobs for testing"}
+              </button>
             </div>
           ) : (
             <div className="space-y-2">
               {myJobs.map((job) => {
-                const style = STATUS_STYLES[job.status] ?? { label: job.status, color: "bg-zinc-600" };
+                const style = STATUS_STYLES[job.status] ?? { label: job.status, color: "text-zinc-500", bg: "bg-zinc-500/10 border-zinc-800/30", icon: "•" };
                 return (
                   <Link
                     key={job.id}
                     href={`/verify/${job.id}`}
-                    className="block rounded-lg border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors"
+                    className="group block rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-all"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm text-zinc-200 line-clamp-2 flex-1">{job.question}</p>
-                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium text-white ${style.color}`}>
-                        {style.label}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-zinc-200 group-hover:text-white transition-colors line-clamp-2">
+                          {job.question}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${style.color} ${style.bg}`}>
+                            <span>{style.icon}</span> {style.label}
+                          </span>
+                          {job.createdAt && (
+                            <span className="text-xs text-zinc-600">{timeAgo(job.createdAt)}</span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-zinc-700 group-hover:text-zinc-500 transition-colors text-sm">&rarr;</span>
                     </div>
-                    {job.createdAt && (
-                      <p className="text-xs text-zinc-600 mt-2">
-                        {new Date(job.createdAt).toLocaleString()}
-                      </p>
-                    )}
                   </Link>
                 );
               })}
