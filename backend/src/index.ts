@@ -245,7 +245,12 @@ export default {
         const jobs = await registry.listJobs(
           requesterId ? { requesterId } : verifierId ? { verifierId } : undefined
         );
-        return json({ jobs }, 200, cors);
+        const webappUrl = (env.WEBAPP_URL ?? "https://webapp-psi-inky.vercel.app").replace(/\/$/, "");
+        const enrichedJobs = jobs.map((j: { id: string;[key: string]: unknown }) => ({
+          ...j,
+          viewUrl: `${webappUrl}/verify/${j.id}`,
+        }));
+        return json({ jobs: enrichedJobs }, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }
@@ -380,9 +385,11 @@ export default {
     const jobMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)$/);
     if (jobMatch && request.method === "GET") {
       try {
-        const agent = await getAgentByName(env.VerificationAgent, jobMatch[1]);
+        const jobId = jobMatch[1];
+        const agent = await getAgentByName(env.VerificationAgent, jobId);
         const status = await agent.getStatus();
-        return json(status, 200, cors);
+        const webappUrl = (env.WEBAPP_URL ?? "https://webapp-psi-inky.vercel.app").replace(/\/$/, "");
+        return json({ ...status, viewUrl: `${webappUrl}/verify/${jobId}` }, 200, cors);
       } catch (err) {
         return json({ error: (err as Error).message }, 500, cors);
       }

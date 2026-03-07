@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { validateQuestion } from "@/lib/validate-question";
+function validateQuestion(question: string): { valid: boolean; error?: string; suggestion?: string } {
+  const trimmed = question.trim();
+  if (trimmed.length < 10) return { valid: false, error: "Question is too short. Please describe what you need verified." };
+  if (trimmed.length > 500) return { valid: false, error: "Question is too long. Keep it under 500 characters." };
+  const isQuestion = /\?$/.test(trimmed);
+  const isRequest = /^(check|verify|confirm|is|are|does|do|how|what|where|when|can|could|will|would|has|have)/i.test(trimmed);
+  if (!isQuestion && !isRequest) return { valid: false, error: "Try phrasing it as a question (ending with ?).", suggestion: `${trimmed}?` };
+  return { valid: true };
+}
 
 const STATUS_STYLES: Record<string, { label: string; color: string }> = {
   connecting: { label: "Waiting", color: "bg-sabi-warning text-sabi-bg" },
