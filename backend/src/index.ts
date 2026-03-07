@@ -1,5 +1,5 @@
 import { routeAgentRequest, getAgentByName } from "agents";
-import type { Env } from "./types";
+import type { Env, AgentState } from "./types";
 import type { JobRegistry } from "./job-registry";
 import {
   buildPaymentRequired,
@@ -39,6 +39,24 @@ function json(data: unknown, status = 200, extraHeaders: HeadersInit = {}): Resp
 function getRegistry(env: Env): DurableObjectStub<JobRegistry> {
   const id = env.JobRegistry.idFromName("global");
   return env.JobRegistry.get(id) as DurableObjectStub<JobRegistry>;
+}
+
+/** Check if a user is the requester or assigned verifier for a job. */
+async function assertJobAccess(
+  env: Env,
+  jobId: string,
+  userId: string,
+): Promise<{ allowed: boolean; status: AgentState | null }> {
+  try {
+    const agent = await getAgentByName(env.VerificationAgent, jobId);
+    const status = await agent.getStatus();
+    const job = status.job;
+    if (!job) return { allowed: false, status: null };
+    const allowed = job.requester_id === userId || job.verifier_id === userId;
+    return { allowed, status };
+  } catch {
+    return { allowed: false, status: null };
+  }
 }
 
 // Paths that don't require auth
@@ -215,15 +233,22 @@ export default {
 
     // WebSocket connections need auth via query param since headers aren't supported
     if (url.pathname.startsWith("/agents/")) {
-      // Allow WebSocket upgrade with ?apiKey= query param
+      let wsUser: AuthUser | null = null;
       const apiKeyParam = url.searchParams.get("apiKey");
       if (apiKeyParam) {
         const registry = getAuthRegistry(env);
-        const user = await registry.getAccountByApiKey(apiKeyParam);
-        if (!user) return json({ error: "Unauthorized" }, 401, cors);
+        const account = await registry.getAccountByApiKey(apiKeyParam);
+        if (!account) return json({ error: "Unauthorized" }, 401, cors);
+        wsUser = account;
       } else {
-        const user = await authenticateRequest(request, env);
-        if (!user) return json({ error: "Unauthorized" }, 401, cors);
+        wsUser = await authenticateRequest(request, env);
+        if (!wsUser) return json({ error: "Unauthorized" }, 401, cors);
+      }
+      // Check job ownership for WebSocket connections
+      const wsJobMatch = url.pathname.match(/^\/agents\/verification-agent\/([^/]+)/);
+      if (wsJobMatch) {
+        const { allowed } = await assertJobAccess(env, wsJobMatch[1], wsUser.id);
+        if (!allowed) return json({ error: "Forbidden" }, 403, cors);
       }
       const agentResp = await routeAgentRequest(request, env);
       if (agentResp) return agentResp;
@@ -236,17 +261,32 @@ export default {
     }
 
     // ── GET /api/verifications ── List verification jobs
+    //   ?mine=true  → jobs where user is requester or verifier (personal dashboard)
+    //   (no filter) → available/unassigned jobs only (discovery for verifiers)
     if (url.pathname === "/api/verifications" && request.method === "GET") {
       try {
         const registry = getRegistry(env);
         const mine = url.searchParams.get("mine");
-        const requesterId = url.searchParams.get("requesterId");
-        const verifierId = mine === "true" ? user.id : url.searchParams.get("verifierId");
-        const jobs = await registry.listJobs(
-          requesterId ? { requesterId } : verifierId ? { verifierId } : undefined
-        );
+        let jobs: Array<{ id: string;[key: string]: unknown }>;
+
+        if (mine === "true") {
+          // Return only jobs the user owns (as requester or verifier)
+          const [asRequester, asVerifier] = await Promise.all([
+            registry.listJobs({ requesterId: user.id }),
+            registry.listJobs({ verifierId: user.id }),
+          ]);
+          const seen = new Set<string>();
+          jobs = [];
+          for (const j of [...asRequester, ...asVerifier]) {
+            if (!seen.has(j.id)) { seen.add(j.id); jobs.push(j); }
+          }
+        } else {
+          // Discovery: only show available (connecting) jobs — no sensitive data leak
+          jobs = await registry.listJobs();
+        }
+
         const webappUrl = (env.WEBAPP_URL ?? "https://webapp-psi-inky.vercel.app").replace(/\/$/, "");
-        const enrichedJobs = jobs.map((j: { id: string;[key: string]: unknown }) => ({
+        const enrichedJobs = jobs.map((j) => ({
           ...j,
           viewUrl: `${webappUrl}/verify/${j.id}`,
         }));
@@ -381,13 +421,14 @@ export default {
       }
     }
 
-    // ── GET /api/verifications/:id ── Get job status
+    // ── GET /api/verifications/:id ── Get job status (requester/verifier only)
     const jobMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)$/);
     if (jobMatch && request.method === "GET") {
       try {
         const jobId = jobMatch[1];
-        const agent = await getAgentByName(env.VerificationAgent, jobId);
-        const status = await agent.getStatus();
+        const { allowed, status } = await assertJobAccess(env, jobId, user.id);
+        if (!status) return json({ error: "Job not found" }, 404, cors);
+        if (!allowed) return json({ error: "Forbidden" }, 403, cors);
         const webappUrl = (env.WEBAPP_URL ?? "https://webapp-psi-inky.vercel.app").replace(/\/$/, "");
         return json({ ...status, viewUrl: `${webappUrl}/verify/${jobId}` }, 200, cors);
       } catch (err) {
@@ -412,11 +453,16 @@ export default {
       }
     }
 
-    // ── POST /api/verifications/:id/archive ── Requester cancels/archives
+    // ── POST /api/verifications/:id/archive ── Requester cancels/archives (requester only)
     const archiveMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/archive$/);
     if (archiveMatch && request.method === "POST") {
       try {
         const jobId = archiveMatch[1];
+        const { allowed, status } = await assertJobAccess(env, jobId, user.id);
+        if (!status) return json({ error: "Job not found" }, 404, cors);
+        if (!allowed || status.job?.requester_id !== user.id) {
+          return json({ error: "Forbidden: only the requester can archive" }, 403, cors);
+        }
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.archiveJob();
 
@@ -429,11 +475,16 @@ export default {
       }
     }
 
-    // ── POST /api/verifications/:id/cancel ── Verifier cancels, job goes back to available
+    // ── POST /api/verifications/:id/cancel ── Verifier cancels (verifier only)
     const cancelMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/cancel$/);
     if (cancelMatch && request.method === "POST") {
       try {
         const jobId = cancelMatch[1];
+        const { status } = await assertJobAccess(env, jobId, user.id);
+        if (!status) return json({ error: "Job not found" }, 404, cors);
+        if (status.job?.verifier_id !== user.id) {
+          return json({ error: "Forbidden: only the verifier can cancel" }, 403, cors);
+        }
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.cancelJob();
 
@@ -446,11 +497,16 @@ export default {
       }
     }
 
-    // ── POST /api/verifications/:id/start ── Start verification session
+    // ── POST /api/verifications/:id/start ── Start verification session (verifier only)
     const startMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/start$/);
     if (startMatch && request.method === "POST") {
       try {
         const jobId = startMatch[1];
+        const { status } = await assertJobAccess(env, jobId, user.id);
+        if (!status) return json({ error: "Job not found" }, 404, cors);
+        if (status.job?.verifier_id !== user.id) {
+          return json({ error: "Forbidden: only the verifier can start" }, 403, cors);
+        }
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.startSession();
 
@@ -463,11 +519,16 @@ export default {
       }
     }
 
-    // ── POST /api/verifications/:id/frames ── Upload a frame (photo)
+    // ── POST /api/verifications/:id/frames ── Upload a frame (verifier only)
     const frameMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/frames$/);
     if (frameMatch && request.method === "POST") {
       try {
         const jobId = frameMatch[1];
+        const { status } = await assertJobAccess(env, jobId, user.id);
+        if (!status) return json({ error: "Job not found" }, 404, cors);
+        if (status.job?.verifier_id !== user.id) {
+          return json({ error: "Forbidden: only the verifier can upload frames" }, 403, cors);
+        }
         const contentType = request.headers.get("Content-Type") ?? "image/jpeg";
         const imageData = await request.arrayBuffer();
         const timestamp = Date.now();
@@ -485,11 +546,16 @@ export default {
       }
     }
 
-    // ── POST /api/verifications/:id/end ── End session with answer
+    // ── POST /api/verifications/:id/end ── End session with answer (verifier only)
     const endMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/end$/);
     if (endMatch && request.method === "POST") {
       try {
         const jobId = endMatch[1];
+        const { status } = await assertJobAccess(env, jobId, user.id);
+        if (!status) return json({ error: "Job not found" }, 404, cors);
+        if (status.job?.verifier_id !== user.id) {
+          return json({ error: "Forbidden: only the verifier can end the session" }, 403, cors);
+        }
         const body = await request.json() as { answer: string; transcript?: string };
         const agent = await getAgentByName(env.VerificationAgent, jobId);
         const result = await agent.endSession(body.answer, body.transcript);
@@ -503,13 +569,14 @@ export default {
       }
     }
 
-    // ── GET /api/verifications/:id/artifact ── Get the completed artifact (payment-gated)
+    // ── GET /api/verifications/:id/artifact ── Get the completed artifact (requester/verifier only, payment-gated)
     const artifactMatch = url.pathname.match(/^\/api\/verifications\/([^/]+)\/artifact$/);
     if (artifactMatch && request.method === "GET") {
       try {
         const jobId = artifactMatch[1];
-        const agent = await getAgentByName(env.VerificationAgent, jobId);
-        const status = await agent.getStatus();
+        const { allowed, status } = await assertJobAccess(env, jobId, user.id);
+        if (!status) return json({ error: "Job not found" }, 404, cors);
+        if (!allowed) return json({ error: "Forbidden" }, 403, cors);
 
         if (!status.job?.payment_tx) {
           return json({ error: "Payment required to access artifact" }, 402, cors);
