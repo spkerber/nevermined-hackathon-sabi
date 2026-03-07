@@ -138,8 +138,9 @@ class GeminiSessionViewModel: ObservableObject {
       guard let self else { return }
       Task { @MainActor in
         for call in toolCall.functionCalls {
+          let callId = call.id
           self.verificationToolHandler?.handleToolCall(call) { [weak self] response in
-            self?.geminiService.sendToolResponse(response)
+            self?.geminiService.sendToolResponse(response, callIds: [callId])
           }
         }
       }

@@ -27,6 +27,9 @@ class GeminiLiveService: ObservableObject {
   private var lastUserSpeechEnd: Date?
   private var responseLatencyLogged = false
 
+  /// Tool call IDs that were cancelled by the server (user interrupted during tool execution)
+  private var cancelledToolCallIds: Set<String> = []
+
   private var webSocketTask: URLSessionWebSocketTask?
   private var receiveTask: Task<Void, Never>?
   private var pingTask: Task<Void, Never>?
@@ -111,6 +114,7 @@ class GeminiLiveService: ObservableObject {
     delegate.onError = nil
     onToolCall = nil
     onToolCallCancellation = nil
+    cancelledToolCallIds.removeAll()
     connectionState = .disconnected
     isModelSpeaking = false
     resolveConnect(success: false)
@@ -145,7 +149,18 @@ class GeminiLiveService: ObservableObject {
     sendJSON(json)
   }
 
-  func sendToolResponse(_ response: [String: Any]) {
+  func sendToolResponse(_ response: [String: Any], callIds: [String] = []) {
+    guard connectionState == .ready else {
+      NSLog("[Gemini] Skipping tool response — connection not ready (%@)",
+            String(describing: connectionState))
+      return
+    }
+    // Don't send responses for tool calls that were already cancelled
+    let activeCalls = callIds.filter { !cancelledToolCallIds.contains($0) }
+    if !callIds.isEmpty && activeCalls.isEmpty {
+      NSLog("[Gemini] Skipping tool response — all call IDs were cancelled")
+      return
+    }
     sendJSON(response)
   }
 
@@ -214,7 +229,11 @@ class GeminiLiveService: ObservableObject {
           let string = String(data: data, encoding: .utf8) else {
       return
     }
-    webSocketTask?.send(.string(string)) { _ in }
+    webSocketTask?.send(.string(string)) { error in
+      if let error {
+        NSLog("[Gemini] WebSocket send error: %@", error.localizedDescription)
+      }
+    }
   }
 
   private func startPinging() {
@@ -299,6 +318,7 @@ class GeminiLiveService: ObservableObject {
     // Tool call cancellation (user interrupted during tool execution)
     if let cancellation = GeminiToolCallCancellation(json: json) {
       NSLog("[Gemini] Tool call cancellation: %@", cancellation.ids.joined(separator: ", "))
+      cancelledToolCallIds.formUnion(cancellation.ids)
       onToolCallCancellation?(cancellation)
       return
     }
