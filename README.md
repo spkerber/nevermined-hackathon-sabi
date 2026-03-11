@@ -2,7 +2,7 @@
 
 A2A verification-as-a-service for the Nevermined hackathon. Requesters submit real-world questions (e.g. "How many Fantas are in the vending machine?"), nearby verifiers with Ray-Ban Meta smart glasses go check, capture photo evidence, and answer vocally. Requesters review the artifact (photos + transcribed answer) in a webapp.
 
-**[Demo video](https://www.youtube.com/watch?v=VIDEO_ID)** — Watch the hackathon demo on YouTube.
+**[Demo video](https://www.youtube.com/watch?v=wxCQB--9uc8)** — Watch the hackathon demo on YouTube.
 
 > This code was initially written for the Nevermined A2A Commerce Hackathon (March 2026). It will only receive updates to clean it up and make it more accessible/readable as a reference project. The app itself is a demo and is not intended for production use.
 
