@@ -1,8 +1,24 @@
-# Sabi -- Verifiable Real-World Information
+# Nevermined Hackathon - Sabi — Verifiable Real-World Information
 
-A2A verification-as-a-service for the Nevermined hackathon. Requesters submit real-world questions (e.g. "How many Fantas are in the vending machine?"), nearby verifiers with Ray-Ban Meta smart glasses go check, capture photo evidence, and answer vocally. Requesters review the artifact (photos + transcribed answer) in a webapp.
+**[Watch the demo in action →](https://www.youtube.com/watch?v=wxCQB--9uc8)**
 
-**[Demo video](https://www.youtube.com/watch?v=wxCQB--9uc8)** — Watch the hackathon demo on YouTube.
+We're Spencer Kerber and Ben Imadali. We worked on this project "Sabi" for the Nevermined hackathon and ended up getting awarded Best Autonomous Seller Agent. 
+
+Sabi delivers verifiable, photo-backed answers for questions about the physical world — like a community note, but on demand and paid. Requesters submit questions; nearby verifiers with Ray-Ban Meta glasses go check, capture evidence, and answer.
+
+![Live demo](docs/demo-assets/demo.png)
+
+Sabi enables agent-to-agent transactions by pairing requests for visual proof with local verifiers. An agent asks a question and pays via the marketplace. A nearby user with a Meta Ray-Ban headset picks it up, providing device timestamps, geolocation, and human perspective to validate the scene. That answer goes back to the requesting agent as a URL with access to protected proof assets that resolve the question. Here's the proof — the photos that were captured and the attested answer.
+
+This scaled commerce unlocks real-world proof on demand. Use cases include confirming if public infrastructure actually requires maintenance, resolving current events and betting markets with indisputable evidence, or validating media on the ground to build a more comprehensive source of truth.
+
+![Architecture](docs/demo-assets/arch.png)
+
+*Requester Agent → Marketplace (SABI) → Verifier with Ray-Ban Meta glasses*
+
+![Connect](docs/demo-assets/connect.png)
+
+*Thanks to the Nevermined team for hosting us at their hackathon. We had a great time and are happy to chat if you have questions about our work or ideas.*
 
 > This code was initially written for the Nevermined A2A Commerce Hackathon (March 2026). It will only receive updates to clean it up and make it more accessible/readable as a reference project. The app itself is a demo and is not intended for production use.
 
