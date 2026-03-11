@@ -2,6 +2,10 @@
 
 A2A verification-as-a-service for the Nevermined hackathon. Requesters submit real-world questions (e.g. "How many Fantas are in the vending machine?"), nearby verifiers with Ray-Ban Meta smart glasses go check, capture photo evidence, and answer vocally. Requesters review the artifact (photos + transcribed answer) in a webapp.
 
+**[Demo video](https://www.youtube.com/watch?v=VIDEO_ID)** — Watch the hackathon demo on YouTube.
+
+> This code was initially written for the Nevermined A2A Commerce Hackathon (March 2026). It will only receive updates to clean it up and make it more accessible/readable as a reference project. The app itself is a demo and is not intended for production use.
+
 ## Live deployment
 
 | Component | URL |
@@ -108,8 +112,8 @@ Details: [docs/doppler-and-env.md](docs/doppler-and-env.md#using-your-cloudflare
 - [docs/design-tokens.md](docs/design-tokens.md) -- Brand and color tokens (A11y, Berkeley Mono–inspired)
 - [docs/references.md](docs/references.md) -- Hackathon and Nevermined links
 - [docs/team.md](docs/team.md) -- Team info
-- [docs/demo-video-script.md](docs/demo-video-script.md) -- Demo video script, scene list, use cases
-- [demo-video/README.md](demo-video/README.md) -- Remotion project for hackathon demo video
+
+Demo video (Remotion, Eleven Labs, brand assets) lives in a separate repo: [nevermined-hackathon-demo-video](https://github.com/spkerber/nevermined-hackathon-demo-video).
 
 ## Buyers / Sellers agents (feature branch)
 
